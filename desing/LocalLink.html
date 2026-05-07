@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>LocalLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="page-dashboard.jsx"></script>
+<script type="text/babel" src="page-resources.jsx"></script>
+<script type="text/babel" src="page-resource-detail.jsx"></script>
+<script type="text/babel" src="page-logs.jsx"></script>
+<script type="text/babel" src="page-settings.jsx"></script>
+<script type="text/babel" src="page-login.jsx"></script>
+<script type="text/babel" src="page-overlays.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#3b82f6",
+  "density": "comfortable",
+  "hostConnected": true,
+  "populated": true,
+  "startScreen": "dashboard"
+}/*EDITMODE-END*/;
+
+const ACCENT_PRESETS = [
+  { value: "#3b82f6", label: "Blue" },
+  { value: "#06b6d4", label: "Cyan" },
+  { value: "#a78bfa", label: "Violet" },
+  { value: "#22c55e", label: "Green" },
+  { value: "#f97316", label: "Orange" },
+];
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [page, setPage] = useState(tweaks.startScreen || "dashboard");
+  const [activeResource, setActiveResource] = useState("r_pgmain");
+  const [addOpen, setAddOpen] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--accent", tweaks.accent);
+    const dark = tweaks.accent;
+    // derive hover
+    document.documentElement.style.setProperty("--accent-hover", dark);
+    document.documentElement.dataset.density = tweaks.density;
+  }, [tweaks.accent, tweaks.density]);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
+
+  const openResource = (id) => { setActiveResource(id); setPage("resource-detail"); };
+
+  const crumbs = {
+    dashboard: ["Dashboard"],
+    resources: ["Resources"],
+    "resource-detail": ["Resources", (window.RESOURCES.find(r => r.id === activeResource) || {}).name || ""],
+    logs: ["Logs"],
+    settings: ["Settings"],
+  }[page] || [page];
+
+  if (page === "login") {
+    return (
+      <>
+        <LoginPage onLogin={() => setPage("dashboard")}/>
+        <TweaksUI tweaks={tweaks} setTweak={setTweak} page={page} setPage={setPage}/>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="app" data-screen-label={"00 " + page}>
+        <Sidebar page={page} setPage={(p) => setPage(p)} hostConnected={tweaks.hostConnected}/>
+        <div className="main">
+          <Topbar crumbs={crumbs}/>
+          {page === "dashboard" && <DashboardPage hostConnected={tweaks.hostConnected} populated={tweaks.populated} onOpen={openResource} onAddResource={() => setAddOpen(true)} onGenerateKey={() => setKeyOpen(true)}/>}
+          {page === "resources" && <ResourcesPage populated={tweaks.populated} onOpen={openResource} onAddResource={() => setAddOpen(true)}/>}
+          {page === "resource-detail" && <ResourceDetailPage resourceId={activeResource} onBack={() => setPage("resources")} onGenerateKey={() => setKeyOpen(true)}/>}
+          {page === "logs" && <LogsPage populated={tweaks.populated}/>}
+          {page === "settings" && <SettingsPage hostConnected={tweaks.hostConnected}/>}
+        </div>
+      </div>
+
+      <AddResourceSlideOver open={addOpen} onClose={() => setAddOpen(false)} onCreate={() => { setAddOpen(false); showToast("Resource created · API key generated"); }}/>
+      <GenerateKeyModal open={keyOpen} onClose={() => setKeyOpen(false)}/>
+
+      <div className="toast-root">
+        {toast && <div className="toast"><span className="dot"/>{toast}</div>}
+      </div>
+
+      <TweaksUI tweaks={tweaks} setTweak={setTweak} page={page} setPage={setPage}/>
+    </>
+  );
+}
+
+function TweaksUI({ tweaks, setTweak, page, setPage }) {
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection title="Navigate">
+        <TweakSelect value={page} onChange={(v) => setPage(v)} options={[
+          { value: "login", label: "Login" },
+          { value: "dashboard", label: "Dashboard" },
+          { value: "resources", label: "Resources" },
+          { value: "resource-detail", label: "Resource detail" },
+          { value: "logs", label: "Logs" },
+          { value: "settings", label: "Settings" },
+        ]}/>
+      </TweakSection>
+      <TweakSection title="Theme">
+        <TweakColor label="Accent" value={tweaks.accent} onChange={(v) => setTweak("accent", v)}
+          options={["#3b82f6", "#06b6d4", "#a78bfa", "#22c55e", "#f97316"]}/>
+        <TweakRadio label="Density" value={tweaks.density} onChange={(v) => setTweak("density", v)}
+          options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }]}/>
+      </TweakSection>
+      <TweakSection title="State">
+        <TweakToggle label="Host connected" value={tweaks.hostConnected} onChange={(v) => setTweak("hostConnected", v)}/>
+        <TweakToggle label="Populated data" value={tweaks.populated} onChange={(v) => setTweak("populated", v)}/>
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+</body>
+</html>

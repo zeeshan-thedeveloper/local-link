@@ -1,0 +1,27 @@
+FROM node:22-alpine AS base
+WORKDIR /app
+RUN corepack enable
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml turbo.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY services/gateway/package.json services/gateway/package.json
+COPY apps/host/package.json apps/host/package.json
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/validators/package.json packages/validators/package.json
+COPY packages/tsconfig/package.json packages/tsconfig/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+ENV NEXT_OUTPUT_STANDALONE=1
+RUN pnpm --filter @locallink/web build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]
