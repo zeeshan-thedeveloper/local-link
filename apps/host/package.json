@@ -1,0 +1,28 @@
+{
+  "name": "@locallink/host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "locallink": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@locallink/shared": "workspace:*",
+    "commander": "^12.1.0",
+    "pg": "^8.13.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@locallink/tsconfig": "workspace:*",
+    "@types/pg": "^8.11.11",
+    "tsx": "^4.19.2"
+  }
+}
+
