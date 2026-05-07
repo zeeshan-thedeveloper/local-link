@@ -1,0 +1,11 @@
+{
+  "extends": "./packages/tsconfig/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@locallink/shared": ["packages/shared/src/index.ts"],
+      "@locallink/validators": ["packages/validators/src/index.ts"]
+    }
+  }
+}
+

@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: locallink
+      POSTGRES_USER: locallink
+      POSTGRES_PASSWORD: locallink
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U locallink -d locallink"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://locallink:locallink@postgres:5432/locallink?schema=public
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      PORT: 3003
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-replace-with-google-client-id}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-replace-with-google-client-secret}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-locallink-dev-secret-change-in-production}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3005}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://localhost:3003}
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      GATEWAY_URL: http://gateway:3003
+      NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
+      PORT: 3000
+    ports:
+      - "${WEB_PORT:-3005}:3000"
+    depends_on:
+      - gateway
+
+volumes:
+  postgres-data:

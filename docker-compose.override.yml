@@ -1,0 +1,33 @@
+services:
+  gateway:
+    build:
+      target: deps
+    command: >
+      sh -c "pnpm install --shamefully-hoist &&
+      pnpm --filter @locallink/gateway prisma:generate &&
+      pnpm --filter @locallink/gateway dev"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/services/gateway/node_modules
+      - /app/packages/shared/node_modules
+      - /app/packages/validators/node_modules
+    working_dir: /app
+
+  postgres:
+
+  web:
+    build:
+      target: deps
+    command: pnpm --filter @locallink/web dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+      - /app/packages/validators/node_modules
+    working_dir: /app
+    environment:
+      GATEWAY_URL: http://gateway:3003
+      NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
