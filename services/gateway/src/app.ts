@@ -106,7 +106,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     const beforeCallbackUserCount = oauthCallbackUserCounts.get(request);
     let oauthSessionUser: { email: string; id: string } | undefined;
     if (beforeCallbackUserCount !== undefined) {
-      const users = await prisma.user.findMany({
+      const users: Array<{ email: string; id: string }> = await prisma.user.findMany({
         orderBy: { createdAt: "asc" },
         select: { email: true, id: true }
       });
