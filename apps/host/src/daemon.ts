@@ -2,23 +2,25 @@ import { io, type Socket } from "socket.io-client";
 import type { HostConfig, HostResourceConfig } from "./config.js";
 import { proxyRequest } from "./proxy.js";
 
-export function startDaemon(config: HostConfig): Socket[] {
-  return config.resources.map((resource) => startResourceDaemon(config.gatewayUrl, resource));
+export type DaemonEvent =
+  | { type: "connected"; resource: HostResourceConfig }
+  | { type: "disconnected"; resource: HostResourceConfig }
+  | { type: "connect_error"; resource: HostResourceConfig; message: string }
+  | { type: "request"; resource: HostResourceConfig; method: string; path: string; statusCode: number; durationMs: number };
+
+export function startDaemon(config: HostConfig, onEvent: (event: DaemonEvent) => void): Socket[] {
+  return config.resources.map((resource) => startResourceDaemon(config.gatewayUrl, resource, onEvent));
 }
 
-function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig): Socket {
+function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, onEvent: (event: DaemonEvent) => void): Socket {
   const socket = io(gatewayUrl, {
     auth: { token: resource.token },
     transports: ["websocket"]
   });
 
-  socket.on("connect", () => {
-    process.stdout.write(`[${resource.name}] connected\n`);
-  });
-
-  socket.on("connect_error", (error) => {
-    process.stderr.write(`[${resource.name}] connection failed: ${error.message}\n`);
-  });
+  socket.on("connect", () => onEvent({ type: "connected", resource }));
+  socket.on("connect_error", (error) => onEvent({ type: "connect_error", resource, message: error.message }));
+  socket.on("disconnect", () => onEvent({ type: "disconnected", resource }));
 
   socket.on("proxy:request", async (request) => {
     if (request.resourceId !== resource.id) {
@@ -31,9 +33,27 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig): 
       return;
     }
 
+    const start = Date.now();
     try {
-      socket.emit("proxy:response", await proxyRequest(resource, request));
+      const response = await proxyRequest(resource, request);
+      onEvent({
+        type: "request",
+        resource,
+        method: request.method,
+        path: request.path,
+        statusCode: response.statusCode,
+        durationMs: Date.now() - start
+      });
+      socket.emit("proxy:response", response);
     } catch (error) {
+      onEvent({
+        type: "request",
+        resource,
+        method: request.method,
+        path: request.path,
+        statusCode: 502,
+        durationMs: Date.now() - start
+      });
       socket.emit("proxy:response", {
         requestId: request.requestId,
         statusCode: 502,
@@ -47,8 +67,5 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig): 
     socket.emit("host:heartbeat");
   }, 15_000);
 
-  socket.on("disconnect", () => {
-    process.stdout.write(`[${resource.name}] disconnected\n`);
-  });
   return socket;
 }
