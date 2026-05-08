@@ -11,7 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "test": "prisma generate && vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.9",
