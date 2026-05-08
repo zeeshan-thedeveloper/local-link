@@ -2,28 +2,45 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/components/layout/AppShell";
 import { useOverlays } from "@/components/overlays/OverlayContext";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TypeBadge } from "@/components/ui/TypeBadge";
-import { KEYS, LOGS, RESOURCES, statusClass } from "@/lib/data";
+import { KEYS, LOGS, statusClass } from "@/lib/data";
+import type { Resource, ResourceType } from "@/lib/types";
 import { displayNameFromEmail } from "@/lib/user";
+
+const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export default function DashboardPage() {
   const router = useRouter();
   const currentUser = useCurrentUser();
   const { openAddResource, openGenerateKey } = useOverlays();
-  const hasResources = RESOURCES.length > 0;
+  const [resources, setResources] = useState<Resource[]>([]);
+  const hasResources = resources.length > 0;
   const hasLogs = LOGS.length > 0;
-  const activeResources = RESOURCES.filter(r => r.status === "active").length;
+  const activeResources = resources.filter(r => r.status === "active").length;
+  const topResources = useMemo(
+    () => resources.filter(r => r.reqs24h > 0).sort((a,b) => b.reqs24h - a.reqs24h).slice(0, 4),
+    [resources]
+  );
   const stats = [
-    { label: "Total resources", icon: "resources", value: String(RESOURCES.length), delta: "No resources connected" },
+    { label: "Total resources", icon: "resources", value: String(resources.length), delta: hasResources ? `${activeResources} active` : "No resources connected" },
     { label: "Active API keys", icon: "key", value: String(KEYS.length), delta: "No keys generated" },
     { label: "Requests today", icon: "activity", value: String(LOGS.length), delta: "No requests yet" },
     { label: "Avg response", icon: "clock", value: "-", delta: "No latency data" },
   ];
+
+  useEffect(() => {
+    void fetch(`${gatewayUrl}/resources`, { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((items: Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>) => {
+        setResources(items.map(normalizeResource));
+      });
+  }, []);
 
   return (
     <div className="page">
@@ -53,7 +70,7 @@ export default function DashboardPage() {
           <div>
             <h3 className="section-title">Resources</h3>
             <p className="section-sub">
-              {hasResources ? `${RESOURCES.length} registered - ${activeResources} active right now` : "Nothing here yet"}
+              {hasResources ? `${resources.length} registered - ${activeResources} active right now` : "Nothing here yet"}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -73,7 +90,7 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {RESOURCES.slice(0, 5).map(r => (
+              {resources.slice(0, 5).map(r => (
                 <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/resources/${r.id}`)}>
                   <td>
                     <div className="resource-name-cell">
@@ -85,7 +102,7 @@ export default function DashboardPage() {
                     </div>
                   </td>
                   <td><TypeBadge type={r.type}/></td>
-                  <td><span className="mono" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{r.endpoint.replace("https://", "")}</span></td>
+                  <td><span className="mono" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{r.endpoint.replace(/^https?:\/\//, "")}</span></td>
                   <td><StatusPill status={r.status}/></td>
                   <td className="num" style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12.5 }}>{r.reqs24h.toLocaleString()}</td>
                   <td><div className="row-actions"><Link href={`/resources/${r.id}`} className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>Manage</Link></div></td>
@@ -156,8 +173,8 @@ export default function DashboardPage() {
           <div className="section">
             <div className="section-head"><h3 className="section-title">Top resources - 24h</h3></div>
             <div style={{ padding: 4 }}>
-              {RESOURCES.filter(r => r.reqs24h > 0).sort((a,b) => b.reqs24h - a.reqs24h).slice(0, 4).map((r, i) => {
-                const max = Math.max(...RESOURCES.map(resource => resource.reqs24h), 1);
+              {topResources.map((r, i) => {
+                const max = Math.max(...resources.map(resource => resource.reqs24h), 1);
                 const pct = (r.reqs24h / max) * 100;
                 return (
                   <div key={r.id} style={{ padding: "10px 14px", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
@@ -174,7 +191,7 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-              {!RESOURCES.some(r => r.reqs24h > 0) ? (
+              {topResources.length === 0 ? (
                 <div className="empty">
                   <div className="icon-wrap"><Icon name="activity" size={18}/></div>
                   <div className="title">No usage yet</div>
@@ -187,4 +204,19 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function normalizeResource(resource: Omit<Resource, "type"> & { type: string }): Resource {
+  const type = resource.type === "ai_model" ? "ai-model" : resource.type === "http_api" ? "http-api" : resource.type;
+  return {
+    ...resource,
+    type: type as ResourceType,
+    subtype: resource.subtype ?? type,
+    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    local: resource.local ?? "-",
+    status: resource.active ? "active" : "inactive",
+    keys: resource.keys ?? 0,
+    lastActive: resource.lastActive ?? "Never",
+    reqs24h: resource.reqs24h ?? 0
+  };
 }
