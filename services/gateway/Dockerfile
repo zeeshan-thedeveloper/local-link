@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY . .
-RUN pnpm --filter @locallink/gateway build
+RUN pnpm --filter @locallink/gateway... build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
