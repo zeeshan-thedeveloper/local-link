@@ -14,16 +14,11 @@ type ConnectHostModalProps = {
 export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }: ConnectHostModalProps) {
   if (!resource) return null;
 
-  const install = "npm install -g @locallink/host";
-  const init = `locallink init \\
+  const setup = `pnpm --filter @locallink/host dev -- setup \\
   --gateway ${gatewayUrl} \\
   --token ${token}`;
-  const register = `locallink register \\
-  --id ${resource.id} \\
-  --type ${resource.type} \\
-  ${resource.type === "database" ? "--connection-string ..." : "--url ..."}`;
-  const start = "locallink start";
-  const all = [install, init, register, start].join("\n\n");
+  const start = "pnpm --filter @locallink/host dev -- start";
+  const all = [setup, start].join("\n\n");
 
   return (
     <>
@@ -32,14 +27,16 @@ export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }:
         <div className="modal-head">
           <h3 className="modal-title">Connect your host</h3>
           <p className="modal-sub">
-            Run this command on the machine where {resource.name} is running. The token is shown only once.
+            Run this from the LocalLink repo on the machine where {resource.name} is running. The token is shown only once.
           </p>
         </div>
         <div className="modal-body" style={{ display: "grid", gap: 12 }}>
-          <CommandBlock label="Step 1 - Install" value={install} />
-          <CommandBlock label="Step 2 - Initialize" value={init} />
-          <CommandBlock label="Step 3 - Register local connection" value={register} />
-          <CommandBlock label="Step 4 - Start" value={start} />
+          <CommandBlock label="Step 1 - Setup wizard" value={setup} />
+          <p className="field-help" style={{ margin: 0 }}>
+            The wizard verifies this resource, asks for the local connection details, saves your host config, and can
+            start the tunnel immediately.
+          </p>
+          <CommandBlock label="Step 2 - Start later" value={start} />
           <div className="callout">
             <Icon name="warn" size={14} />
             <div>This token will not be shown again. Store it securely.</div>

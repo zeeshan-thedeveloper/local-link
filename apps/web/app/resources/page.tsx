@@ -10,6 +10,7 @@ import { TypeBadge } from "@/components/ui/TypeBadge";
 import type { Resource, ResourceType } from "@/lib/types";
 
 type Filter = "all" | ResourceType;
+type HostStatus = { id: string; socketId: string; lastSeen: string | null };
 
 const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
@@ -18,6 +19,7 @@ export default function ResourcesPage() {
   const { openAddResource } = useOverlays();
   const [filter, setFilter] = useState<Filter>("all");
   const [resources, setResources] = useState<Resource[]>([]);
+  const [connectedHostIds, setConnectedHostIds] = useState<Set<string>>(new Set());
   const populated = resources.length > 0;
   const types: Array<{ id: Filter; label: string }> = [
     { id: "all", label: "All" },
@@ -31,12 +33,37 @@ export default function ResourcesPage() {
   );
 
   useEffect(() => {
-    void fetch(`${gatewayUrl}/resources`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : []))
-      .then((items: Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>) => {
-        setResources(items.map(normalizeResource));
-      });
+    void loadResources();
   }, []);
+
+  const loadResources = async () => {
+    const [resourceItems, status] = await Promise.all([
+      fetch(`${gatewayUrl}/resources`, { credentials: "include" })
+        .then((response) => (response.ok ? response.json() : [])) as Promise<Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>>,
+      fetch(`${gatewayUrl}/tunnel/status`, { credentials: "include" })
+        .then((response) => (response.ok ? response.json() : { hosts: [] })) as Promise<{ hosts: HostStatus[] }>
+    ]);
+    setResources(resourceItems.map(normalizeResource));
+    setConnectedHostIds(new Set(status.hosts.map((host) => host.id)));
+  };
+
+  const deleteResource = async (resource: Resource) => {
+    if (!window.confirm(`Delete ${resource.name}? This removes the resource and its host token.`)) return;
+    const response = await fetch(`${gatewayUrl}/resources/${resource.id}`, {
+      method: "DELETE",
+      credentials: "include"
+    });
+    if (!response.ok) {
+      window.alert(`Could not delete ${resource.name}`);
+      return;
+    }
+    setResources((items) => items.filter((item) => item.id !== resource.id));
+    setConnectedHostIds((ids) => {
+      const next = new Set(ids);
+      next.delete(resource.id);
+      return next;
+    });
+  };
 
   return (
     <div className="page">
@@ -72,7 +99,7 @@ export default function ResourcesPage() {
                 <th>Status</th>
                 <th>Host token</th>
                 <th>Created</th>
-                <th style={{ width: 60 }}></th>
+                <th style={{ width: 140 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -86,10 +113,40 @@ export default function ResourcesPage() {
                   </td>
                   <td><TypeBadge type={resource.type} /></td>
                   <td><span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>{`${gatewayUrl}/r/${resource.id}`}</span></td>
-                  <td><StatusPill status={resource.active ? "active" : "inactive"} /></td>
+                  <td>
+                    <StatusPill
+                      status={connectedHostIds.has(resource.id) ? "connected" : "disconnected"}
+                      label={connectedHostIds.has(resource.id) ? "Online" : "Offline"}
+                    />
+                  </td>
                   <td><span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>{resource.tokenPrefix ?? "hidden"}</span></td>
                   <td style={{ color: "var(--text-2)", fontSize: 12.5 }}>{formatDate(resource.createdAt)}</td>
-                  <td><button className="btn btn-ghost btn-icon btn-sm" onClick={(event) => event.stopPropagation()}><Icon name="moreH" size={14} /></button></td>
+                  <td>
+                    <div className="row-actions">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(`/resources/${resource.id}`);
+                        }}
+                        type="button"
+                      >
+                        Manage
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void deleteResource(resource);
+                        }}
+                        style={{ color: "var(--red)" }}
+                        title="Delete resource"
+                        type="button"
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

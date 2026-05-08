@@ -125,7 +125,6 @@ export default function ResourceDetailPage() {
 
       {tab === "connect" && (
         <ConnectSection
-          resource={resource}
           host={host}
           rotatedToken={rotatedToken}
           onRotate={async () => {
@@ -165,11 +164,14 @@ function EndpointSection({ endpoint, curl }: { endpoint: string; curl: string })
   );
 }
 
-function ConnectSection({ resource, host, rotatedToken, onRotate }: { resource: Resource; host?: HostStatus; rotatedToken: string | null; onRotate: () => Promise<void> }) {
-  const register = `locallink register \\
-  --id ${resource.id} \\
-  --type ${resource.type} \\
-  ${resource.type === "database" ? "--connection-string ..." : "--url ..."}`;
+function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; rotatedToken: string | null; onRotate: () => Promise<void> }) {
+  const setupWithToken = rotatedToken
+    ? `pnpm --filter @locallink/host dev -- setup \\
+  --gateway ${gatewayUrl} \\
+  --token ${rotatedToken}`
+    : `pnpm --filter @locallink/host dev -- setup \\
+  --gateway ${gatewayUrl} \\
+  --token <regenerated token>`;
   return (
     <div className="section">
       <div className="section-head">
@@ -181,11 +183,11 @@ function ConnectSection({ resource, host, rotatedToken, onRotate }: { resource: 
           <dt>Last seen</dt><dd>{host?.lastSeen ? formatDate(host.lastSeen) : "Never"}</dd>
           <dt>Socket</dt><dd>{host?.socketId ?? "-"}</dd>
         </dl>
-        <CommandBlock label="Install" value="npm install -g @locallink/host" />
-        <CommandBlock label="Initialize" value={`locallink init --gateway ${gatewayUrl} --token <token shown once>`} />
-        <CommandBlock label="Register local connection" value={register} />
-        <CommandBlock label="Start" value="locallink start" />
-        {rotatedToken && <CommandBlock label="New token" value={rotatedToken} />}
+        <CommandBlock label={rotatedToken ? "Setup with new token" : "Setup wizard"} value={setupWithToken} />
+        <p className="field-help" style={{ margin: 0 }}>
+          The original token was shown only once. Regenerate a token here when you need to connect this resource again.
+        </p>
+        <CommandBlock label="Start later" value="pnpm --filter @locallink/host dev -- start" />
         <button className="btn btn-secondary" type="button" onClick={() => void onRotate()} style={{ justifySelf: "start" }}>
           <Icon name="refresh" size={13} />Regenerate token
         </button>

@@ -15,16 +15,31 @@ export async function login(formData: FormData) {
   });
   if (!response.ok) redirect("/login?error=1");
 
-  const setCookie = response.headers.get("set-cookie");
-  const token = setCookie?.match(/locallink_session=([^;]+)/)?.[1];
-  if (token) {
-    const cookieStore = await cookies();
-    cookieStore.set("locallink_session", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7
-    });
-  }
+  const token = getSessionToken(response.headers);
+  if (!token) redirect("/login?error=session");
+
+  const cookieStore = await cookies();
+  cookieStore.set("locallink_session", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7
+  });
+
   redirect("/dashboard");
+}
+
+function getSessionToken(headers: Headers) {
+  const cookieHeaders =
+    (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ??
+    [headers.get("set-cookie")].filter((value): value is string => Boolean(value));
+
+  const sessionCookie = cookieHeaders.find((header) => /^locallink_session=/i.test(header));
+  const token = sessionCookie?.match(/^locallink_session=([^;]+)/i)?.[1];
+
+  if (token) {
+    return decodeURIComponent(token);
+  }
+
+  return null;
 }
