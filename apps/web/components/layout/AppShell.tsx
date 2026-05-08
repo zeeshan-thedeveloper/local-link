@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AddResourceSlideOver } from "@/components/overlays/AddResourceSlideOver";
 import { ConnectHostModal } from "@/components/overlays/ConnectHostModal";
@@ -12,6 +12,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 const CurrentUserContext = createContext<CurrentUser | null>(null);
+const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export function useCurrentUser() {
   return useContext(CurrentUserContext);
@@ -34,11 +35,36 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     token: string;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const hostConnected = false;
+  const [connectedHostCount, setConnectedHostCount] = useState(0);
   const overlayValue = useMemo(() => ({
     openAddResource: () => setAddOpen(true),
     openGenerateKey: () => setKeyOpen(true),
   }), []);
+
+  useEffect(() => {
+    if (pathname.startsWith("/login")) return;
+
+    let cancelled = false;
+    const loadHostStatus = async () => {
+      try {
+        const response = await fetch(`${gatewayUrl}/tunnel/status`, { credentials: "include" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { hosts?: Array<{ id: string }> };
+        if (!cancelled) setConnectedHostCount(data.hosts?.length ?? 0);
+      } catch {
+        if (!cancelled) setConnectedHostCount(0);
+      }
+    };
+
+    void loadHostStatus();
+    const interval = window.setInterval(() => void loadHostStatus(), 10_000);
+    window.addEventListener("focus", loadHostStatus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", loadHostStatus);
+    };
+  }, [pathname]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -57,7 +83,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     <CurrentUserContext.Provider value={currentUser}>
       <OverlayContextProvider value={overlayValue}>
         <div className="app">
-          <Sidebar hostConnected={hostConnected} />
+          <Sidebar connectedHostCount={connectedHostCount} />
           <main className="main">
             <Topbar crumbs={crumbsForPath(pathname)} currentUser={currentUser} />
             {children}
@@ -82,7 +108,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           open={Boolean(connectHost)}
           onClose={() => setConnectHost(null)}
           resource={connectHost?.resource ?? null}
-          gatewayUrl={process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003"}
+          gatewayUrl={gatewayUrl}
           token={connectHost?.token ?? ""}
         />
         <GenerateKeyModal open={keyOpen} onClose={() => setKeyOpen(false)} />
