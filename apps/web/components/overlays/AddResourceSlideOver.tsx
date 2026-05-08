@@ -47,7 +47,11 @@ export function AddResourceSlideOver({
       try {
         const config =
           type === "database"
-            ? { engine: "postgres", connectionString: connectionString || localUrl || "postgresql://localhost:5433/locallink" }
+            ? {
+                engine: "postgres",
+                connectionString:
+                  connectionString || localUrl || "postgresql://locallink:locallink@localhost:5433/locallink"
+              }
             : type === "ai-model"
               ? { provider: "openai-compatible", baseUrl: localUrl || "http://localhost:11434", model: name || "local" }
               : { url: localUrl || "http://localhost:3000" };
@@ -113,11 +117,11 @@ export function AddResourceSlideOver({
             <div className="field-label">Local URL <span className="opt">on host machine</span></div>
             <input
               className="input mono"
-              placeholder={type === "database" ? "postgresql://localhost:5432/app" : type === "ai-model" ? "http://localhost:11434" : "http://localhost:3000"}
+              placeholder={type === "database" ? "postgresql://localhost:5433/locallink" : type === "ai-model" ? "http://localhost:11434" : "http://localhost:3000"}
               value={localUrl}
               onChange={(event) => setLocalUrl(event.target.value)}
             />
-            <div className="field-help">You can update this later with the host CLI register command.</div>
+            <div className="field-help">You can update this later with the host CLI setup wizard.</div>
           </div>
           {type === "database" && (
             <div className="field">
@@ -125,7 +129,7 @@ export function AddResourceSlideOver({
               <textarea
                 className="textarea"
                 rows={3}
-                placeholder="postgresql://user:password@localhost:5432/db?sslmode=disable"
+                placeholder="postgresql://locallink:locallink@localhost:5433/locallink?sslmode=disable"
                 value={connectionString}
                 onChange={(event) => setConnectionString(event.target.value)}
               />

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @locallink/host add @inquirer/prompts)",
+      "Bash(pnpm --filter @locallink/host typecheck)",
+      "Bash(pnpm --filter @locallink/host dev -- status)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
+    ]
+  }
+}
