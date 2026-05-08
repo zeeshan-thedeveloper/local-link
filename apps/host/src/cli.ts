@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { input, password, select, confirm } from "@inquirer/prompts";
 import {
   createDefaultConfig,
   loadConfig,
   saveConfig,
   type HostResourceConfig
 } from "./config.js";
+import type { DatabaseResourceConfig, HttpResourceConfig, AiModelResourceConfig } from "@locallink/shared";
 import { startDaemon } from "./daemon.js";
 
 const program = new Command();
@@ -145,6 +147,86 @@ function defaultResourceConfig(type: HostResourceConfig["type"]): HostResourceCo
   if (type === "ai-model") return { provider: "openai-compatible", baseUrl: "http://localhost:11434", model: "local" };
   return { url: "http://localhost:3000" };
 }
+
+program.command("setup").description("Interactive wizard to initialise and register a resource").action(async () => {
+  let existingConfig: Awaited<ReturnType<typeof loadConfig>> | undefined;
+  try {
+    existingConfig = await loadConfig();
+  } catch {
+    // no config yet — fine
+  }
+
+  const gatewayUrl = trimTrailingSlash(
+    await input({
+      message: "Gateway URL:",
+      default: existingConfig?.gatewayUrl ?? "http://localhost:3003"
+    })
+  );
+
+  const token = await password({
+    message: "Host token (from the dashboard):"
+  });
+
+  process.stdout.write("Verifying token…\n");
+  const response = await fetch(`${gatewayUrl}/hosts/me`, {
+    headers: { authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    process.stderr.write(`Failed to verify token: ${response.status} ${response.statusText}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const host = (await response.json()) as {
+    resourceId: string;
+    name: string;
+    type: HostResourceConfig["type"];
+    gatewayUrl?: string;
+  };
+  process.stdout.write(`Found resource: ${host.name} (${host.type})\n`);
+
+  const config = existingConfig ?? createDefaultConfig(gatewayUrl);
+  config.gatewayUrl = host.gatewayUrl ?? gatewayUrl;
+  const existing = config.resources.find((r) => r.id === host.resourceId);
+
+  let resourceConfig: HostResourceConfig["config"];
+  if (host.type === "database") {
+    const existingCs = existing?.type === "database" ? (existing.config as DatabaseResourceConfig).connectionString : undefined;
+    const connectionString = await input({
+      message: "Postgres connection string:",
+      default: existingCs ?? "postgresql://localhost:5432/app"
+    });
+    resourceConfig = { engine: "postgres", connectionString };
+  } else if (host.type === "http-api") {
+    const existingUrl = existing?.type === "http-api" ? (existing.config as HttpResourceConfig).url : undefined;
+    const url = await input({
+      message: "Local HTTP base URL:",
+      default: existingUrl ?? "http://localhost:3000"
+    });
+    resourceConfig = { url };
+  } else {
+    const existingBase = existing?.type === "ai-model" ? (existing.config as AiModelResourceConfig).baseUrl : undefined;
+    const baseUrl = await input({
+      message: "Local model base URL:",
+      default: existingBase ?? "http://localhost:11434"
+    });
+    resourceConfig = { provider: "openai-compatible", baseUrl, model: host.name };
+  }
+
+  config.resources = [
+    ...config.resources.filter((r) => r.id !== host.resourceId),
+    { id: host.resourceId, name: host.name, type: host.type, token, config: resourceConfig }
+  ];
+  await saveConfig(config);
+  process.stdout.write(`Saved config for '${host.name}'.\n`);
+
+  const shouldStart = await confirm({ message: "Start the tunnel now?", default: true });
+  if (shouldStart) {
+    startDaemon(config);
+  } else {
+    process.stdout.write("Run `locallink start` when ready.\n");
+  }
+});
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, "");
