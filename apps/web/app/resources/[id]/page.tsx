@@ -35,6 +35,14 @@ export default function ResourceDetailPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [rotatedToken, setRotatedToken] = useState<string | null>(null);
 
+  const refreshKeys = () => {
+    fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).then(setKeys).catch(() => {});
+  };
+
+  const revokeKey = (keyId: string) => {
+    void fetchJson(`/keys/${keyId}`, { method: "DELETE" }).then(refreshKeys).catch(() => {});
+  };
+
   useEffect(() => {
     void Promise.all([
       fetchJson<Resource & { type: ResourceType | "ai_model" | "http_api" }>(`/resources/${params.id}`),
@@ -118,7 +126,7 @@ export default function ResourceDetailPage() {
             <div className="stat-card"><div className="stat-label"><Icon name="resources" size={13} />Resource</div><div className="stat-value" style={{ fontSize: 18 }}>{resource.active ? "Active" : "Inactive"}</div><div className="stat-delta">gateway routing</div></div>
           </div>
           <EndpointSection endpoint={endpoint} curl={curl} />
-          <KeysSection keys={keys} onGenerateKey={openGenerateKey} />
+          <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />
           <RequestsTable logs={logs} />
         </>
       )}
@@ -133,18 +141,14 @@ export default function ResourceDetailPage() {
           }}
         />
       )}
-      {tab === "keys" && <KeysSection keys={keys} onGenerateKey={openGenerateKey} />}
+      {tab === "keys" && <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />}
       {tab === "logs" && <RequestsTable logs={logs} />}
       {tab === "config" && (
-        <div className="section">
-          <div className="section-head"><div><h3 className="section-title">Configuration</h3></div></div>
-          <dl className="kv-grid">
-            <dt>Resource ID</dt><dd>{resource.id}</dd>
-            <dt>Type</dt><dd>{resource.type}</dd>
-            <dt>Host ID</dt><dd>{resource.hostId}</dd>
-            <dt>Gateway URL</dt><dd>{endpoint}</dd>
-          </dl>
-        </div>
+        <ConfigSection
+          resource={resource}
+          endpoint={endpoint}
+          onSaved={(updated) => setResource((r) => r ? { ...r, config: updated.config } : r)}
+        />
       )}
     </div>
   );
@@ -205,7 +209,7 @@ function CommandBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function KeysSection({ keys, onGenerateKey }: { keys: ApiKey[]; onGenerateKey: () => void }) {
+function KeysSection({ keys, onGenerateKey, onRevokeKey }: { keys: ApiKey[]; onGenerateKey: () => void; onRevokeKey: (id: string) => void }) {
   return (
     <div className="section">
       <div className="section-head">
@@ -221,10 +225,10 @@ function KeysSection({ keys, onGenerateKey }: { keys: ApiKey[]; onGenerateKey: (
               <td><span className="mono" style={{ fontSize: 12.5, color: "var(--text-2)" }}>{key.prefix}</span></td>
               <td style={{ color: "var(--text-2)", fontSize: 12.5 }}>{formatDate(key.createdAt ?? key.created)}</td>
               <td style={{ color: "var(--text-2)", fontSize: 12.5 }}>{key.lastUsed ? formatDate(key.lastUsed) : "Never"}</td>
-              <td><div className="row-actions"><button className="btn btn-ghost btn-sm" style={{ color: "var(--red)" }}>Revoke</button></div></td>
+              <td><div className="row-actions"><button className="btn btn-ghost btn-sm" style={{ color: "var(--red)" }} onClick={() => key.id && onRevokeKey(key.id)} disabled={!key.id}>Revoke</button></div></td>
             </tr>
           )) : (
-            <tr><td colSpan={5}><div className="empty"><div className="title">No API keys</div><div className="sub">Generate a key after connecting a resource.</div></div></td></tr>
+            <tr><td colSpan={5}><div className="empty"><div className="title">No API keys</div><div className="sub">Generate a key to start making requests.</div></div></td></tr>
           )}
         </tbody>
       </table>
@@ -254,6 +258,100 @@ function RequestsTable({ logs }: { logs: RequestLog[] }) {
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+type DbConfig = { engine: string; connectionString?: string; filePath?: string };
+type HttpConfig = { url: string; headers?: Record<string, string> };
+
+function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; endpoint: string; onSaved: (r: Resource) => void }) {
+  const config = resource.config as DbConfig | HttpConfig | null | undefined;
+  const isDb = resource.type === "database";
+  const isHttp = resource.type === "http-api";
+
+  const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
+  const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const newConfig = isDb
+        ? { engine: (config as DbConfig)?.engine ?? "postgres", connectionString: connStr }
+        : { url: httpUrl };
+      const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ config: newConfig })
+      });
+      onSaved(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <div><h3 className="section-title">Configuration</h3><p className="section-sub">Update connection details for this resource</p></div>
+      </div>
+      <div style={{ padding: 18, display: "grid", gap: 16 }}>
+        <dl className="kv-grid" style={{ margin: 0 }}>
+          <dt>Resource ID</dt><dd className="mono" style={{ fontSize: 12 }}>{resource.id}</dd>
+          <dt>Type</dt><dd>{resource.type}</dd>
+          <dt>Gateway URL</dt><dd className="mono" style={{ fontSize: 12 }}>{endpoint}</dd>
+        </dl>
+
+        {isDb && (
+          <div className="field">
+            <div className="field-label">Connection string</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                className="input"
+                type={show ? "text" : "password"}
+                value={connStr}
+                onChange={e => setConnStr(e.target.value)}
+                placeholder="postgresql://user:password@localhost:5432/dbname"
+                style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
+              />
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShow(s => !s)} style={{ flexShrink: 0 }}>
+                {show ? "Hide" : "Show"}
+              </button>
+            </div>
+            <div className="field-help">Changes take effect immediately — the host will use the new string on next query.</div>
+          </div>
+        )}
+
+        {isHttp && (
+          <div className="field">
+            <div className="field-label">Base URL</div>
+            <input
+              className="input"
+              type="text"
+              value={httpUrl}
+              onChange={e => setHttpUrl(e.target.value)}
+              placeholder="http://localhost:8080"
+            />
+          </div>
+        )}
+
+        {error && <div className="callout" style={{ color: "var(--red)" }}><Icon name="warn" size={14} />{error}</div>}
+
+        <div>
+          <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={saving}>
+            {saved ? <><Icon name="check" size={13} />Saved</> : saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

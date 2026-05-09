@@ -12,13 +12,34 @@ export function startDaemon(config: HostConfig, onEvent: (event: DaemonEvent) =>
   return config.resources.map((resource) => startResourceDaemon(config.gatewayUrl, resource, onEvent));
 }
 
+async function fetchLatestConfig(gatewayUrl: string, token: string): Promise<{ config: unknown } | null> {
+  try {
+    const res = await fetch(`${gatewayUrl}/hosts/me`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<{ config: unknown }>;
+  } catch {
+    return null;
+  }
+}
+
 function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, onEvent: (event: DaemonEvent) => void): Socket {
+  let liveResource = resource;
+
   const socket = io(gatewayUrl, {
     auth: { token: resource.token },
     transports: ["websocket"]
   });
 
-  socket.on("connect", () => onEvent({ type: "connected", resource }));
+  socket.on("connect", () => {
+    void fetchLatestConfig(gatewayUrl, resource.token).then((latest) => {
+      if (latest?.config) {
+        liveResource = { ...resource, config: latest.config as typeof resource.config };
+      }
+      onEvent({ type: "connected", resource });
+    });
+  });
   socket.on("connect_error", (error) => onEvent({ type: "connect_error", resource, message: error.message }));
   socket.on("disconnect", () => onEvent({ type: "disconnected", resource }));
 
@@ -35,7 +56,7 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
 
     const start = Date.now();
     try {
-      const response = await proxyRequest(resource, request);
+      const response = await proxyRequest(liveResource, request);
       onEvent({
         type: "request",
         resource,

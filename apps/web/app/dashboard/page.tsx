@@ -18,7 +18,7 @@ const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLI
 export default function DashboardPage() {
   const router = useRouter();
   const currentUser = useCurrentUser();
-  const { openAddResource, openGenerateKey } = useOverlays();
+  const { openAddResource } = useOverlays();
   const [resources, setResources] = useState<Resource[]>([]);
   const hasResources = resources.length > 0;
   const hasLogs = LOGS.length > 0;
@@ -50,7 +50,7 @@ export default function DashboardPage() {
           <p className="page-sub">Overview of your local resources and gateway activity.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary" onClick={openGenerateKey}><Icon name="key" size={13}/>Generate API key</button>
+          <button className="btn btn-secondary" onClick={() => router.push("/resources")}><Icon name="key" size={13}/>Generate API key</button>
           <button className="btn btn-primary" onClick={openAddResource}><Icon name="plus" size={13}/>Add resource</button>
         </div>
       </div>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                 <div style={{ textAlign: "left" }}><div className="name">Add a resource</div><div className="desc">Tunnel a new local service</div></div>
                 <Icon name="chevronR" size={14} className="arrow"/>
               </button>
-              <button className="qa-card" onClick={openGenerateKey} style={{ background: "transparent", border: "1px solid var(--border)" }}>
+              <button className="qa-card" onClick={() => router.push("/resources")} style={{ background: "transparent", border: "1px solid var(--border)" }}>
                 <div className="icon-wrap"><Icon name="key" size={15}/></div>
                 <div style={{ textAlign: "left" }}><div className="name">Generate API key</div><div className="desc">Issue a token for a resource</div></div>
                 <Icon name="chevronR" size={14} className="arrow"/>

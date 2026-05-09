@@ -195,6 +195,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       resourceId: resource.id,
       name: resource.name,
       type: fromPrismaResourceType(resource.type),
+      config: resource.config,
       gatewayUrl: process.env.BACKEND_BASE_URL
     };
   });
