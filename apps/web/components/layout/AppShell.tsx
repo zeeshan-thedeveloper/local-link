@@ -29,7 +29,7 @@ function crumbsForPath(pathname: string) {
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: CurrentUser | null }) {
   const pathname = usePathname();
   const [addOpen, setAddOpen] = useState(false);
-  const [keyOpen, setKeyOpen] = useState(false);
+  const [keyContext, setKeyContext] = useState<{ resourceId: string; onCreated?: () => void } | null>(null);
   const [connectHost, setConnectHost] = useState<{
     resource: { id: string; name: string; type: ResourceType };
     token: string;
@@ -38,11 +38,11 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   const [connectedHostCount, setConnectedHostCount] = useState(0);
   const overlayValue = useMemo(() => ({
     openAddResource: () => setAddOpen(true),
-    openGenerateKey: () => setKeyOpen(true),
+    openGenerateKey: (resourceId: string, onCreated?: () => void) => setKeyContext({ resourceId, onCreated }),
   }), []);
 
   useEffect(() => {
-    if (pathname.startsWith("/login")) return;
+    if (pathname === "/" || pathname.startsWith("/login")) return;
 
     let cancelled = false;
     const loadHostStatus = async () => {
@@ -71,7 +71,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     setTimeout(() => setToast(null), 1800);
   };
 
-  if (pathname.startsWith("/login")) {
+  if (pathname === "/" || pathname.startsWith("/login")) {
     return (
       <CurrentUserContext.Provider value={currentUser}>
         <OverlayContextProvider value={overlayValue}>{children}</OverlayContextProvider>
@@ -111,7 +111,13 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           gatewayUrl={gatewayUrl}
           token={connectHost?.token ?? ""}
         />
-        <GenerateKeyModal open={keyOpen} onClose={() => setKeyOpen(false)} />
+        <GenerateKeyModal
+          open={Boolean(keyContext)}
+          resourceId={keyContext?.resourceId ?? null}
+          onClose={() => setKeyContext(null)}
+          onCreated={() => { keyContext?.onCreated?.(); showToast("API key created"); }}
+          gatewayUrl={gatewayUrl}
+        />
         <div className="toast-root">
           {toast && <div className="toast"><span className="dot"/>{toast}</div>}
         </div>

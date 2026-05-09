@@ -4,7 +4,7 @@ import { createContext, useContext } from "react";
 
 export interface OverlayContextValue {
   openAddResource: () => void;
-  openGenerateKey: () => void;
+  openGenerateKey: (resourceId: string, onCreated?: () => void) => void;
 }
 
 const OverlayContext = createContext<OverlayContextValue | null>(null);
