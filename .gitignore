@@ -12,3 +12,6 @@ prisma/dev.db
 
 # Local-only tunnel client — not for committing
 packages/client/
+
+# Publishing guide — local reference only
+PUBLISHING.md
