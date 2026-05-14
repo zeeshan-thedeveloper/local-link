@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { getCurrentUser } from "@/lib/gateway";
-import "../styles/globals.css";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "LocalLink",
