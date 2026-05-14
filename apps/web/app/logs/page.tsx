@@ -1,19 +1,55 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
-import { LOGS, RESOURCES, statusClass } from "@/lib/data";
+import { statusClass } from "@/lib/data";
+import type { RequestLog, Resource, ResourceType } from "@/lib/types";
 
 type StatusFilter = "all" | "2xx" | "4xx" | "5xx";
+type BackendLog = {
+  id: string;
+  resourceId: string;
+  apiKeyId: string | null;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  createdAt: string;
+};
+type LogsResponse = { items: BackendLog[]; page: number; limit: number; total: number };
+
+const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export default function LogsPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [resource, setResource] = useState("all");
   const [expanded, setExpanded] = useState<number | null>(null);
-  const populated = LOGS.length > 0;
+  const [logs, setLogs] = useState<RequestLog[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const populated = logs.length > 0;
 
-  const items = LOGS.filter(l => {
+  useEffect(() => {
+    void Promise.all([
+      fetch(`${gatewayUrl}/logs?limit=50`, { credentials: "include" }).then((response) => (response.ok ? response.json() : { items: [] })),
+      fetch(`${gatewayUrl}/resources`, { credentials: "include" }).then((response) => (response.ok ? response.json() : []))
+    ])
+      .then(([logsResponse, resourceItems]: [
+        LogsResponse,
+        Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>
+      ]) => {
+        const normalizedResources = resourceItems.map(normalizeResource);
+        const resourceMap = new Map(normalizedResources.map(item => [item.id, item.name]));
+        setResources(normalizedResources);
+        setLogs(logsResponse.items.map(item => normalizeLog(item, resourceMap)));
+      })
+      .catch(() => {
+        setResources([]);
+        setLogs([]);
+      });
+  }, []);
+
+  const items = logs.filter(l => {
     if (filter === "2xx" && !(l.status >= 200 && l.status < 300)) return false;
     if (filter === "4xx" && !(l.status >= 400 && l.status < 500)) return false;
     if (filter === "5xx" && !(l.status >= 500)) return false;
@@ -38,7 +74,7 @@ export default function LogsPage() {
         <div className="filters">
           <select className="filter-input" value={resource} onChange={e => setResource(e.target.value)} style={{ minWidth: 180 }}>
             <option value="all">All resources</option>
-            {RESOURCES.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+            {resources.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
           </select>
           {[
             { id: "all", label: "All" },
@@ -49,7 +85,7 @@ export default function LogsPage() {
             <button key={f.id} className={"chip " + (filter === f.id ? "active" : "")} onClick={() => setFilter(f.id as StatusFilter)}>{f.label}</button>
           ))}
           <span className="chip"><Icon name="clock" size={12}/>Last 1 hour</span>
-          <input className="filter-input filter-search" placeholder="Search path or method…" style={{ flex: 1, maxWidth: 360, marginLeft: "auto" }}/>
+          <input className="filter-input filter-search" placeholder="Search path or method..." style={{ flex: 1, maxWidth: 360, marginLeft: "auto" }}/>
           <button className="chip"><Icon name="refresh" size={12}/></button>
         </div>
 
@@ -69,9 +105,9 @@ export default function LogsPage() {
             </thead>
             <tbody>
               {items.map((l, i) => {
-                const resType = RESOURCES.find(r => r.name === l.res)?.type || "http-api";
+                const resType = resources.find(r => r.name === l.res)?.type || "http-api";
                 return (
-                  <Fragment key={i}>
+                  <Fragment key={l.id ?? i}>
                     <tr style={{ cursor: "pointer" }} onClick={() => setExpanded(expanded === i ? null : i)}>
                       <td style={{ color: "var(--text-3)" }}><Icon name={expanded === i ? "chevronD" : "chevronR"} size={12}/></td>
                       <td style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-3)" }}>{l.time}</td>
@@ -100,11 +136,11 @@ X-Request-Id: req_8h2j${i}q4xv9bL2p
 }`}</pre>
                           </div>
                           <div>
-                            <h4>Response · {l.status} · {l.dur}</h4>
+                            <h4>Response - {l.status} - {l.dur}</h4>
                             <pre>{`HTTP/1.1 ${l.status} ${l.status === 200 ? "OK" : l.status === 401 ? "Unauthorized" : l.status === 404 ? "Not Found" : l.status === 429 ? "Too Many Requests" : "Internal Server Error"}
 Content-Type: application/json
 X-Tunnel-Latency: ${l.dur}
-X-Resource-Id: ${RESOURCES.find(r => r.name === l.res)?.id || "r_xxx"}
+X-Resource-Id: ${resources.find(r => r.name === l.res)?.id || "r_xxx"}
 
 ${l.status === 200 ? '{\n  "rows": [{"id": 42, "email": "ada@kestrel.io"}],\n  "rowCount": 1\n}' : l.status === 401 ? '{\n  "error": "invalid_api_key",\n  "message": "Key was revoked"\n}' : '{\n  "error": "upstream_error"\n}'}`}</pre>
                           </div>
@@ -126,14 +162,42 @@ ${l.status === 200 ? '{\n  "rows": [{"id": 42, "email": "ada@kestrel.io"}],\n  "
 
         {populated && items.length > 0 && (
           <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--text-3)" }}>
-            <span>Showing {items.length} of {LOGS.length} requests</span>
+            <span>Showing {items.length} of {logs.length} requests</span>
             <div style={{ display: "flex", gap: 4 }}>
-              <button className="btn btn-ghost btn-sm">← Prev</button>
-              <button className="btn btn-ghost btn-sm">Next →</button>
+              <button className="btn btn-ghost btn-sm">Prev</button>
+              <button className="btn btn-ghost btn-sm">Next</button>
             </div>
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function normalizeLog(item: BackendLog, resourceMap: Map<string, string>): RequestLog {
+  return {
+    id: item.id,
+    time: new Date(item.createdAt).toISOString(),
+    res: resourceMap.get(item.resourceId) ?? item.resourceId,
+    method: item.method as RequestLog["method"],
+    path: item.path,
+    status: item.statusCode,
+    dur: `${item.durationMs}ms`,
+    key: item.apiKeyId ?? "–",
+  };
+}
+
+function normalizeResource(resource: Omit<Resource, "type"> & { type: string }): Resource {
+  const type = resource.type === "ai_model" ? "ai-model" : resource.type === "http_api" ? "http-api" : resource.type;
+  return {
+    ...resource,
+    type: type as ResourceType,
+    subtype: resource.subtype ?? type,
+    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    local: resource.local ?? "-",
+    status: !resource.active ? "inactive" : (resource as Resource & { connected?: boolean }).connected ? "active" : "idle",
+    keys: resource.keys ?? 0,
+    lastActive: resource.lastActive ?? "Never",
+    reqs24h: resource.reqs24h ?? 0
+  };
 }

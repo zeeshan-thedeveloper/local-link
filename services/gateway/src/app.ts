@@ -201,9 +201,22 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   });
 
   app.get("/resources", { preHandler: requireDashboardAuth }, async () => {
-    const resources = await prisma.resource.findMany({ orderBy: { createdAt: "desc" } });
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [resources, requestCounts] = await Promise.all([
+      prisma.resource.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.requestLog.groupBy({
+        by: ["resourceId"],
+        where: { createdAt: { gte: since } },
+        _count: { resourceId: true }
+      })
+    ]);
+    const reqs24hByResource = new Map(requestCounts.map(count => [count.resourceId, count._count.resourceId]));
     const connectedIds = new Set(tunnel.connectedHosts().map(h => h.id));
-    return resources.map(r => ({ ...serializeResource(r), connected: connectedIds.has(r.id) }));
+    return resources.map(r => ({
+      ...serializeResource(r),
+      connected: connectedIds.has(r.id),
+      reqs24h: reqs24hByResource.get(r.id) ?? 0
+    }));
   });
 
   app.post("/resources", { preHandler: requireDashboardAuth }, async (request, reply) => {
@@ -312,6 +325,25 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   app.delete<{ Params: KeyParams }>("/keys/:id", { preHandler: requireDashboardAuth }, async (request) => {
     await prisma.apiKey.delete({ where: { id: request.params.id } });
     return { ok: true };
+  });
+
+  app.get("/logs/recent", { preHandler: requireDashboardAuth }, async () => {
+    const items = await prisma.requestLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { resource: { select: { name: true } } }
+    });
+
+    return items.map(item => ({
+      id: item.id,
+      time: item.createdAt.toISOString(),
+      res: item.resource.name,
+      method: item.method,
+      path: item.path,
+      status: item.statusCode,
+      dur: `${item.durationMs}ms`,
+      key: item.apiKeyId ? item.apiKeyId.slice(0, 8) : "–"
+    }));
   });
 
   app.get<{ Querystring: LogsQuery }>("/logs", { preHandler: requireDashboardAuth }, async (request) => {

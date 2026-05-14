@@ -1,27 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/components/layout/AppShell";
 import { useOverlays } from "@/components/overlays/OverlayContext";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
-import { StatusPill } from "@/components/ui/StatusPill";
-import { TypeBadge } from "@/components/ui/TypeBadge";
-import { KEYS, LOGS, statusClass } from "@/lib/data";
-import type { Resource, ResourceType } from "@/lib/types";
+import { KEYS, statusClass } from "@/lib/data";
+import type { RequestLog, Resource, ResourceType } from "@/lib/types";
 import { displayNameFromEmail } from "@/lib/user";
 
 const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const currentUser = useCurrentUser();
   const { openAddResource } = useOverlays();
   const [resources, setResources] = useState<Resource[]>([]);
+  const [logs, setLogs] = useState<RequestLog[]>([]);
   const hasResources = resources.length > 0;
-  const hasLogs = LOGS.length > 0;
+  const hasLogs = logs.length > 0;
   const activeResources = resources.filter(r => r.status === "active").length;
   const topResources = useMemo(
     () => resources.filter(r => r.reqs24h > 0).sort((a,b) => b.reqs24h - a.reqs24h).slice(0, 4),
@@ -30,15 +27,25 @@ export default function DashboardPage() {
   const stats = [
     { label: "Total resources", icon: "resources", value: String(resources.length), delta: hasResources ? `${activeResources} active` : "No resources connected" },
     { label: "Active API keys", icon: "key", value: String(KEYS.length), delta: "No keys generated" },
-    { label: "Requests today", icon: "activity", value: String(LOGS.length), delta: "No requests yet" },
+    { label: "Requests today", icon: "activity", value: String(logs.length), delta: hasLogs ? "Recent requests loaded" : "0 requests loaded" },
     { label: "Avg response", icon: "clock", value: "-", delta: "No latency data" },
   ];
 
   useEffect(() => {
-    void fetch(`${gatewayUrl}/resources`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : []))
-      .then((items: Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>) => {
-        setResources(items.map(normalizeResource));
+    void Promise.all([
+      fetch(`${gatewayUrl}/resources`, { credentials: "include" }).then((response) => (response.ok ? response.json() : [])),
+      fetch(`${gatewayUrl}/logs/recent`, { credentials: "include" }).then((response) => (response.ok ? response.json() : []))
+    ])
+      .then(([resourceItems, logItems]: [
+        Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>,
+        RequestLog[]
+      ]) => {
+        setResources(resourceItems.map(normalizeResource));
+        setLogs(logItems);
+      })
+      .catch(() => {
+        setResources([]);
+        setLogs([]);
       });
   }, []);
 
@@ -50,7 +57,6 @@ export default function DashboardPage() {
           <p className="page-sub">Overview of your local resources and gateway activity.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => router.push("/resources")}><Icon name="key" size={13}/>Generate API key</button>
           <button className="btn btn-primary" onClick={openAddResource}><Icon name="plus" size={13}/>Add resource</button>
         </div>
       </div>
@@ -65,61 +71,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="section">
-        <div className="section-head">
-          <div>
-            <h3 className="section-title">Resources</h3>
-            <p className="section-sub">
-              {hasResources ? `${resources.length} registered - ${activeResources} active right now` : "Nothing here yet"}
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Link href="/resources" className="btn btn-ghost btn-sm">View all<Icon name="chevronR" size={12}/></Link>
-          </div>
-        </div>
-        {hasResources ? (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th style={{ width: "30%" }}>Name</th>
-                <th>Type</th>
-                <th>Endpoint</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Reqs - 24h</th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {resources.slice(0, 5).map(r => (
-                <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/resources/${r.id}`)}>
-                  <td>
-                    <div className="resource-name-cell">
-                      <ResIcon type={r.type}/>
-                      <div>
-                        <div className="name">{r.name}</div>
-                        <div className="sub">{r.subtype}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td><TypeBadge type={r.type}/></td>
-                  <td><span className="mono" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{r.endpoint.replace(/^https?:\/\//, "")}</span></td>
-                  <td><StatusPill status={r.status}/></td>
-                  <td className="num" style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12.5 }}>{r.reqs24h.toLocaleString()}</td>
-                  <td><div className="row-actions"><Link href={`/resources/${r.id}`} className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>Manage</Link></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty">
-            <div className="icon-wrap"><Icon name="resources" size={18}/></div>
-            <div className="title">No resources connected</div>
-            <div className="sub">Connect your first resource to start routing requests through the gateway.</div>
-            <button className="btn btn-primary" onClick={openAddResource}><Icon name="plus" size={13}/>Add resource</button>
-          </div>
-        )}
-      </div>
-
       <div className="split-2">
         <div className="section">
           <div className="section-head">
@@ -132,7 +83,7 @@ export default function DashboardPage() {
           {hasLogs ? (
             <table className="tbl">
               <tbody>
-                {LOGS.slice(0, 8).map((l, i) => (
+                {logs.slice(0, 8).map((l, i) => (
                   <tr key={i}>
                     <td className="mono dim" style={{ width: 90, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-3)" }}>{l.time.slice(0, 8)}</td>
                     <td style={{ color: "var(--text-1)", fontSize: 12.5 }}>{l.res}</td>
@@ -154,22 +105,6 @@ export default function DashboardPage() {
         </div>
 
         <div>
-          <div className="section">
-            <div className="section-head"><h3 className="section-title">Quick actions</h3></div>
-            <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <button className="qa-card" onClick={openAddResource} style={{ background: "transparent", border: "1px solid var(--border)" }}>
-                <div className="icon-wrap"><Icon name="plus" size={15}/></div>
-                <div style={{ textAlign: "left" }}><div className="name">Add a resource</div><div className="desc">Tunnel a new local service</div></div>
-                <Icon name="chevronR" size={14} className="arrow"/>
-              </button>
-              <button className="qa-card" onClick={() => router.push("/resources")} style={{ background: "transparent", border: "1px solid var(--border)" }}>
-                <div className="icon-wrap"><Icon name="key" size={15}/></div>
-                <div style={{ textAlign: "left" }}><div className="name">Generate API key</div><div className="desc">Issue a token for a resource</div></div>
-                <Icon name="chevronR" size={14} className="arrow"/>
-              </button>
-            </div>
-          </div>
-
           <div className="section">
             <div className="section-head"><h3 className="section-title">Top resources - 24h</h3></div>
             <div style={{ padding: 4 }}>
