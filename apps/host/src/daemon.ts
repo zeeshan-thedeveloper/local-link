@@ -35,7 +35,7 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
   socket.on("connect", () => {
     void fetchLatestConfig(gatewayUrl, resource.token).then((latest) => {
       if (latest?.config) {
-        liveResource = { ...resource, config: latest.config as typeof resource.config };
+        liveResource = { ...resource, config: latest.config as typeof resource.config } as HostResourceConfig;
       }
       onEvent({ type: "connected", resource });
     });
