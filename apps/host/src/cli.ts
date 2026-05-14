@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import type { AiModelResourceConfig, DatabaseResourceConfig, HttpResourceConfig } from "@locallink/shared";
 import { confirm, input, password } from "@inquirer/prompts";
 import { Command } from "commander";
 import {
@@ -33,7 +32,7 @@ program
         type: host.type,
         token: options.token,
         config: existing?.config ?? defaultResourceConfig(host.type)
-      }
+      } as HostResourceConfig
     ];
     await saveConfig(config);
     process.stdout.write(`Initialized resource '${host.name}' (id: ${host.resourceId})\n`);
@@ -73,7 +72,7 @@ program
 
     config.resources = [
       ...config.resources.filter((resource) => resource.id !== host.resourceId),
-      { id: host.resourceId, name: host.name, type: host.type, token, config: resourceConfig }
+      { id: host.resourceId, name: host.name, type: host.type, token, config: resourceConfig } as HostResourceConfig
     ];
     await saveConfig(config);
     process.stdout.write(`Saved config for '${host.name}'.\n`);
@@ -174,28 +173,28 @@ async function verifyHostToken(gatewayUrl: string, token: string): Promise<HostL
 async function promptForResourceConfig(host: HostLookup, existing?: HostResourceConfig): Promise<HostResourceConfig["config"]> {
   if (host.type === "database") {
     const existingConnectionString =
-      existing?.type === "database" ? (existing.config as DatabaseResourceConfig).connectionString : undefined;
+      existing?.type === "database" ? existing.config.connectionString : undefined;
     const connectionString = await input({
       message: "Postgres connection string:",
       default: existingConnectionString ?? "postgresql://locallink:locallink@localhost:5433/locallink"
     });
-    return { engine: "postgres", connectionString };
+    return { type: "database", engine: "postgres", connectionString };
   }
   if (host.type === "http-api") {
-    const existingUrl = existing?.type === "http-api" ? (existing.config as HttpResourceConfig).url : undefined;
+    const existingUrl = existing?.type === "http-api" ? existing.config.url : undefined;
     const url = await input({
       message: "Local HTTP base URL:",
       default: existingUrl ?? "http://localhost:3000"
     });
-    return { url };
+    return { type: "http-api", url };
   }
 
-  const existingBaseUrl = existing?.type === "ai-model" ? (existing.config as AiModelResourceConfig).baseUrl : undefined;
+  const existingBaseUrl = existing?.type === "ai-model" ? existing.config.baseUrl : undefined;
   const baseUrl = await input({
     message: "Local model base URL:",
     default: existingBaseUrl ?? "http://localhost:11434"
   });
-  return { provider: "openai-compatible", baseUrl, model: host.name };
+  return { type: "ai-model", provider: "openai-compatible", baseUrl, model: host.name };
 }
 
 function toResource(options: Record<string, string | undefined>, existing?: HostResourceConfig): HostResourceConfig {
@@ -211,7 +210,7 @@ function toResource(options: Record<string, string | undefined>, existing?: Host
       name,
       type: "http-api",
       token: existing.token,
-      config: { url: options.url }
+      config: { type: "http-api", url: options.url }
     };
   }
   if (type === "database") {
@@ -221,7 +220,7 @@ function toResource(options: Record<string, string | undefined>, existing?: Host
       name,
       type: "database",
       token: existing.token,
-      config: { engine: "postgres", connectionString: options.connectionString }
+      config: { type: "database", engine: "postgres", connectionString: options.connectionString }
     };
   }
   if (type === "ai-model") {
@@ -231,7 +230,7 @@ function toResource(options: Record<string, string | undefined>, existing?: Host
       name,
       type: "ai-model",
       token: existing.token,
-      config: { provider: "openai-compatible", baseUrl: options.url, model: name }
+      config: { type: "ai-model", provider: "openai-compatible", baseUrl: options.url, model: name }
     };
   }
   throw new Error("Unsupported resource type");
@@ -259,10 +258,10 @@ async function loadExistingConfig() {
 
 function defaultResourceConfig(type: HostResourceConfig["type"]): HostResourceConfig["config"] {
   if (type === "database") {
-    return { engine: "postgres", connectionString: "postgresql://locallink:locallink@localhost:5433/locallink" };
+    return { type: "database", engine: "postgres", connectionString: "postgresql://locallink:locallink@localhost:5433/locallink" };
   }
-  if (type === "ai-model") return { provider: "openai-compatible", baseUrl: "http://localhost:11434", model: "local" };
-  return { url: "http://localhost:3000" };
+  if (type === "ai-model") return { type: "ai-model", provider: "openai-compatible", baseUrl: "http://localhost:11434", model: "local" };
+  return { type: "http-api", url: "http://localhost:3000" };
 }
 
 const C = {
