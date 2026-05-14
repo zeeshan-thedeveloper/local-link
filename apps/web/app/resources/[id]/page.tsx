@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
-import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -74,10 +73,6 @@ export default function ResourceDetailPage() {
   }
 
   const endpoint = `${gatewayUrl}/r/${resource.id}`;
-  const curl = `curl -X POST ${endpoint}/query \\
-  -H "Authorization: Bearer ll_..." \\
-  -H "Content-Type: application/json" \\
-  -d '{"sql": "SELECT * FROM users LIMIT 10"}'`;
 
   return (
     <div className="page">
@@ -125,7 +120,6 @@ export default function ResourceDetailPage() {
             <div className="stat-card"><div className="stat-label"><Icon name="key" size={13} />API keys</div><div className="stat-value">{keys.length}</div><div className="stat-delta">authorized tokens</div></div>
             <div className="stat-card"><div className="stat-label"><Icon name="resources" size={13} />Resource</div><div className="stat-value" style={{ fontSize: 18 }}>{resource.active ? "Active" : "Inactive"}</div><div className="stat-delta">gateway routing</div></div>
           </div>
-          <EndpointSection endpoint={endpoint} curl={curl} />
           <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />
           <RequestsTable logs={logs} />
         </>
@@ -154,28 +148,26 @@ export default function ResourceDetailPage() {
   );
 }
 
-function EndpointSection({ endpoint, curl }: { endpoint: string; curl: string }) {
-  return (
-    <div className="section">
-      <div className="section-head"><div><h3 className="section-title">Endpoint</h3><p className="section-sub">Public gateway URL for this resource.</p></div></div>
-      <div style={{ padding: 18 }}>
-        <div className="field-label">Gateway URL</div>
-        <div className="code"><span className="text">{endpoint}</span><CopyBtn /></div>
-        <div className="field-label" style={{ marginTop: 18 }}>Example request</div>
-        <pre className="code-block">{curl}</pre>
-      </div>
-    </div>
-  );
-}
-
 function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; rotatedToken: string | null; onRotate: () => Promise<void> }) {
-  const setupWithToken = rotatedToken
-    ? `pnpm --filter @locallink/host dev -- setup \\
-  --gateway ${gatewayUrl} \\
-  --token ${rotatedToken}`
-    : `pnpm --filter @locallink/host dev -- setup \\
-  --gateway ${gatewayUrl} \\
-  --token <regenerated token>`;
+  const tokenArg = rotatedToken ?? "<regenerated token>";
+  const setupSteps = [
+    {
+      number: 1,
+      label: "Configure gateway",
+      command: `pnpm --filter @locallink/host dev -- setup --gateway ${gatewayUrl}`
+    },
+    {
+      number: 2,
+      label: "Authenticate",
+      command: `append --token ${tokenArg}`
+    },
+    {
+      number: 3,
+      label: "Start the host",
+      command: "pnpm --filter @locallink/host dev -- start"
+    }
+  ];
+
   return (
     <div className="section">
       <div className="section-head">
@@ -187,11 +179,14 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
           <dt>Last seen</dt><dd>{host?.lastSeen ? formatDate(host.lastSeen) : "Never"}</dd>
           <dt>Socket</dt><dd>{host?.socketId ?? "-"}</dd>
         </dl>
-        <CommandBlock label={rotatedToken ? "Setup with new token" : "Setup wizard"} value={setupWithToken} />
+        <div style={{ display: "grid", gap: 14 }}>
+          {setupSteps.map((step) => (
+            <CommandStep key={step.number} number={step.number} label={step.label} command={step.command} />
+          ))}
+        </div>
         <p className="field-help" style={{ margin: 0 }}>
           The original token was shown only once. Regenerate a token here when you need to connect this resource again.
         </p>
-        <CommandBlock label="Start later" value="pnpm --filter @locallink/host dev -- start" />
         <button className="btn btn-secondary" type="button" onClick={() => void onRotate()} style={{ justifySelf: "start" }}>
           <Icon name="refresh" size={13} />Regenerate token
         </button>
@@ -200,11 +195,30 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
   );
 }
 
-function CommandBlock({ label, value }: { label: string; value: string }) {
+function CommandStep({ number, label, command }: { number: number; label: string; command: string }) {
   return (
-    <div>
-      <div className="field-label">{label}</div>
-      <pre className="code-block" style={{ margin: 0 }}>{value}</pre>
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          color: "var(--text-1)",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 12,
+          fontWeight: 700,
+          flexShrink: 0
+        }}
+      >
+        {number}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div className="field-label">{label}</div>
+        <pre className="code-block" style={{ margin: 0 }}>{command}</pre>
+      </div>
     </div>
   );
 }
