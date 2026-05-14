@@ -1,5 +1,11 @@
 # locallink
 
+## 0.3.1
+
+### Patch Changes
+
+- d60e9e6: Fix version number shown in CLI dashboard header
+
 ## 0.3.0
 
 ### Minor Changes
