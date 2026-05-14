@@ -202,7 +202,8 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
 
   app.get("/resources", { preHandler: requireDashboardAuth }, async () => {
     const resources = await prisma.resource.findMany({ orderBy: { createdAt: "desc" } });
-    return resources.map(serializeResource);
+    const connectedIds = new Set(tunnel.connectedHosts().map(h => h.id));
+    return resources.map(r => ({ ...serializeResource(r), connected: connectedIds.has(r.id) }));
   });
 
   app.post("/resources", { preHandler: requireDashboardAuth }, async (request, reply) => {
