@@ -3,17 +3,20 @@ export const resourceTypes = ["database", "ai-model", "http-api"] as const;
 export type ResourceType = (typeof resourceTypes)[number];
 
 export type HttpResourceConfig = {
+  type: "http-api";
   url: string;
   headers?: Record<string, string>;
 };
 
 export type DatabaseResourceConfig = {
+  type: "database";
   engine: "postgres" | "sqlite";
   connectionString?: string;
   filePath?: string;
 };
 
 export type AiModelResourceConfig = {
+  type: "ai-model";
   provider: "ollama" | "openai-compatible";
   baseUrl: string;
   model: string;
@@ -24,15 +27,27 @@ export type ResourceConfig =
   | DatabaseResourceConfig
   | AiModelResourceConfig;
 
-export type Resource = {
+type ResourceBase = {
   id: string;
   name: string;
-  type: ResourceType;
-  config: ResourceConfig;
   hostId: string;
   active: boolean;
   createdAt: string;
 };
+
+export type Resource =
+  | (ResourceBase & {
+      type: "database";
+      config: DatabaseResourceConfig;
+    })
+  | (ResourceBase & {
+      type: "http-api";
+      config: HttpResourceConfig;
+    })
+  | (ResourceBase & {
+      type: "ai-model";
+      config: AiModelResourceConfig;
+    });
 
 export type ApiKey = {
   id: string;
@@ -90,4 +105,3 @@ export type ConnectedHost = {
   connectedAt: string;
   lastSeen: string;
 };
-
