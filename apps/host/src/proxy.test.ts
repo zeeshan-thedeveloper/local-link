@@ -21,7 +21,7 @@ describe("proxyRequest", () => {
     if (!address || typeof address === "string") throw new Error("Expected TCP server address");
 
     const result = await proxyRequest(
-      { id: "res_1", type: "http-api", config: { url: `http://127.0.0.1:${address.port}` } },
+      { id: "res_1", type: "http-api", config: { type: "http-api", url: `http://127.0.0.1:${address.port}` } },
       {
         requestId: "req_1",
         resourceId: "res_1",

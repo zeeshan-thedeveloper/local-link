@@ -1,8 +1,7 @@
 import type {
+  AiModelResourceConfig,
   DatabaseResourceConfig,
   HttpResourceConfig,
-  ResourceConfig,
-  ResourceType,
   TunnelRequestPayload,
   TunnelResponsePayload
 } from "@locallink/shared";
@@ -10,9 +9,11 @@ import { Client } from "pg";
 
 export type LocalResource = {
   id: string;
-  type: ResourceType;
-  config: ResourceConfig;
-};
+} & (
+  | { type: "database"; config: DatabaseResourceConfig }
+  | { type: "http-api"; config: HttpResourceConfig }
+  | { type: "ai-model"; config: AiModelResourceConfig }
+);
 
 export async function proxyRequest(
   resource: LocalResource,
@@ -24,7 +25,7 @@ export async function proxyRequest(
   if (resource.type === "database") {
     return queryPostgres(resource.config as DatabaseResourceConfig, request);
   }
-  return proxyHttp({ url: (resource.config as { baseUrl: string }).baseUrl }, request);
+  return proxyHttp({ type: "http-api", url: (resource.config as { baseUrl: string }).baseUrl }, request);
 }
 
 async function proxyHttp(

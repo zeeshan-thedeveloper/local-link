@@ -1,10 +1,19 @@
 {
-  "name": "@locallink/host",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@locallink/cli",
+  "version": "0.3.0",
   "type": "module",
   "bin": {
     "locallink": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
