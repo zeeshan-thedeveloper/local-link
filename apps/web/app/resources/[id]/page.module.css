@@ -1,5 +1,36 @@
-.configSection + .configSection {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--border);
+.configLayout {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+}
+
+.configNav {
+  border-right: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.configNavItem {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-right: 2px solid transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  margin-right: -1px;
+  padding: 9px 14px;
+  text-align: left;
+  width: calc(100% + 1px);
+}
+
+.configNavItem.active {
+  background: var(--surface-2);
+  border-right-color: var(--accent);
+  color: var(--text-0);
+}
+
+.configContent {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
 }
