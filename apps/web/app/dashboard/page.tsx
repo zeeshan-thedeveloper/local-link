@@ -214,7 +214,7 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
     subtype: resource.subtype ?? type,
     endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
     local: resource.local ?? "-",
-    status: resource.active ? "active" : "inactive",
+    status: !resource.active ? "inactive" : (resource as Resource & { connected?: boolean }).connected ? "active" : "idle",
     keys: resource.keys ?? 0,
     lastActive: resource.lastActive ?? "Never",
     reqs24h: resource.reqs24h ?? 0
