@@ -285,6 +285,7 @@ function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; en
   const isDb = resource.type === "database";
   const isHttp = resource.type === "http-api";
 
+  const [configTab, setConfigTab] = useState<"local" | "gateway">("local");
   const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
   const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
   const [show, setShow] = useState(false);
@@ -319,8 +320,29 @@ function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; en
       <div className="section-head">
         <div><h3 className="section-title">Configuration</h3><p className="section-sub">Update connection details for this resource</p></div>
       </div>
-      <div style={{ padding: 18, display: "grid", gap: 16 }}>
-        <div className={styles.configSection}>
+      <div className={styles.configLayout}>
+        <div className={styles.configNav}>
+          <button
+            className={`${styles.configNavItem} ${configTab === "local" ? styles.active : ""}`}
+            type="button"
+            onClick={() => setConfigTab("local")}
+          >
+            <Icon name="server" size={13} />
+            Local Match
+          </button>
+          <button
+            className={`${styles.configNavItem} ${configTab === "gateway" ? styles.active : ""}`}
+            type="button"
+            onClick={() => setConfigTab("gateway")}
+          >
+            <Icon name="globe" size={13} />
+            Gateway
+          </button>
+        </div>
+
+        <div className={styles.configContent}>
+          {configTab === "local" ? (
+            <>
           <h3>Local Match Configuration</h3>
           <p>Update how the host agent connects to your local resource.</p>
 
@@ -365,9 +387,11 @@ function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; en
               {saved ? <><Icon name="check" size={13} />Saved</> : saving ? "Saving…" : "Save changes"}
             </button>
           </div>
-        </div>
+            </>
+          ) : null}
 
-        <div className={styles.configSection}>
+          {configTab === "gateway" ? (
+            <>
           <h3>Gateway Configuration</h3>
           <p>Read-only identifiers used by external clients to reach this resource.</p>
           <dl className="kv-grid" style={{ margin: 0 }}>
@@ -375,6 +399,8 @@ function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; en
             <dt>Type</dt><dd>{resource.type}</dd>
             <dt>Gateway URL</dt><dd className="mono" style={{ fontSize: 12 }}>{endpoint}</dd>
           </dl>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
