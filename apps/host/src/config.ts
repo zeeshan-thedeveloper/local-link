@@ -1,15 +1,15 @@
-import type { ResourceConfig, ResourceType } from "@locallink/shared";
+import type { AiModelResourceConfig, DatabaseResourceConfig, HttpResourceConfig } from "@locallink/shared";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export type HostResourceConfig = {
-  id: string;
-  name: string;
-  type: ResourceType;
-  token: string;
-  config: ResourceConfig;
-};
+type HostResourceBase = { id: string; name: string; token: string };
+
+export type HostResourceConfig = HostResourceBase & (
+  | { type: "database"; config: DatabaseResourceConfig }
+  | { type: "http-api"; config: HttpResourceConfig }
+  | { type: "ai-model"; config: AiModelResourceConfig }
+);
 
 export type HostConfig = {
   gatewayUrl: string;
