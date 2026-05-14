@@ -8,6 +8,7 @@ import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
+import styles from "./page.module.css";
 
 type Tab = "overview" | "connect" | "keys" | "logs" | "config";
 type HostStatus = { id: string; socketId: string; lastSeen: string | null };
@@ -319,51 +320,61 @@ function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; en
         <div><h3 className="section-title">Configuration</h3><p className="section-sub">Update connection details for this resource</p></div>
       </div>
       <div style={{ padding: 18, display: "grid", gap: 16 }}>
-        <dl className="kv-grid" style={{ margin: 0 }}>
-          <dt>Resource ID</dt><dd className="mono" style={{ fontSize: 12 }}>{resource.id}</dd>
-          <dt>Type</dt><dd>{resource.type}</dd>
-          <dt>Gateway URL</dt><dd className="mono" style={{ fontSize: 12 }}>{endpoint}</dd>
-        </dl>
+        <div className={styles.configSection}>
+          <h3>Local Match Configuration</h3>
+          <p>Update how the host agent connects to your local resource.</p>
 
-        {isDb && (
-          <div className="field">
-            <div className="field-label">Connection string</div>
-            <div style={{ display: "flex", gap: 8 }}>
+          {isDb && (
+            <div className="field">
+              <div className="field-label">Connection string</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  className="input"
+                  type={show ? "text" : "password"}
+                  value={connStr}
+                  onChange={e => setConnStr(e.target.value)}
+                  placeholder="postgresql://user:password@localhost:5432/dbname"
+                  style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
+                />
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShow(s => !s)} style={{ flexShrink: 0 }}>
+                  {show ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isHttp && (
+            <div className="field">
+              <div className="field-label">Base URL</div>
               <input
                 className="input"
-                type={show ? "text" : "password"}
-                value={connStr}
-                onChange={e => setConnStr(e.target.value)}
-                placeholder="postgresql://user:password@localhost:5432/dbname"
-                style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
+                type="text"
+                value={httpUrl}
+                onChange={e => setHttpUrl(e.target.value)}
+                placeholder="http://localhost:8080"
               />
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShow(s => !s)} style={{ flexShrink: 0 }}>
-                {show ? "Hide" : "Show"}
-              </button>
             </div>
-            <div className="field-help">Changes take effect immediately — the host will use the new string on next query.</div>
+          )}
+
+          <div className="field-help">Changes take effect immediately — the host will use the new string on next query.</div>
+
+          {error && <div className="callout" style={{ color: "var(--red)" }}><Icon name="warn" size={14} />{error}</div>}
+
+          <div>
+            <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={saving}>
+              {saved ? <><Icon name="check" size={13} />Saved</> : saving ? "Saving…" : "Save changes"}
+            </button>
           </div>
-        )}
+        </div>
 
-        {isHttp && (
-          <div className="field">
-            <div className="field-label">Base URL</div>
-            <input
-              className="input"
-              type="text"
-              value={httpUrl}
-              onChange={e => setHttpUrl(e.target.value)}
-              placeholder="http://localhost:8080"
-            />
-          </div>
-        )}
-
-        {error && <div className="callout" style={{ color: "var(--red)" }}><Icon name="warn" size={14} />{error}</div>}
-
-        <div>
-          <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={saving}>
-            {saved ? <><Icon name="check" size={13} />Saved</> : saving ? "Saving…" : "Save changes"}
-          </button>
+        <div className={styles.configSection}>
+          <h3>Gateway Configuration</h3>
+          <p>Read-only identifiers used by external clients to reach this resource.</p>
+          <dl className="kv-grid" style={{ margin: 0 }}>
+            <dt>Resource ID</dt><dd className="mono" style={{ fontSize: 12 }}>{resource.id}</dd>
+            <dt>Type</dt><dd>{resource.type}</dd>
+            <dt>Gateway URL</dt><dd className="mono" style={{ fontSize: 12 }}>{endpoint}</dd>
+          </dl>
         </div>
       </div>
     </div>
