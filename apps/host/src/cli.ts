@@ -279,7 +279,7 @@ function renderDashboard(gatewayUrl: string, resourceNames: string[]) {
   const w = process.stdout.columns || 72;
   const line = "─".repeat(w);
   process.stdout.write("\x1bc"); // clear screen
-  process.stdout.write(`${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.1.0${C.reset}  ${C.gray}→ ${gatewayUrl}${C.reset}\n`);
+  process.stdout.write(`${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${gatewayUrl}${C.reset}\n`);
   process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
   process.stdout.write(`${C.bold}  Tunnels${C.reset}\n`);
   for (const name of resourceNames) {
