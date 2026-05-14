@@ -6,6 +6,13 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has("locallink_session");
 
+  if ((pathname === "/login" || pathname === "/") && hasSession) {
+    const dashUrl = request.nextUrl.clone();
+    dashUrl.pathname = "/dashboard";
+    dashUrl.search = "";
+    return NextResponse.redirect(dashUrl);
+  }
+
   if (protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
     if (!hasSession) {
       const loginUrl = request.nextUrl.clone();
@@ -19,5 +26,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/resources/:path*", "/logs/:path*", "/settings/:path*"],
+  matcher: ["/", "/login", "/dashboard/:path*", "/resources/:path*", "/logs/:path*", "/settings/:path*"],
 };

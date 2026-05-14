@@ -9,7 +9,6 @@ export function Sidebar({ connectedHostCount }: { connectedHostCount: number }) 
   const items = [
     { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: "dashboard", kbd: "G D" },
     { id: "resources", href: "/resources", label: "Resources", icon: "resources", kbd: "G R" },
-    { id: "logs", href: "/logs", label: "Logs", icon: "logs", kbd: "G L" },
     { id: "settings", href: "/settings", label: "Settings", icon: "settings", kbd: "G S" },
   ];
   const activeId = pathname.startsWith("/resources") ? "resources" : pathname.split("/")[1] || "dashboard";

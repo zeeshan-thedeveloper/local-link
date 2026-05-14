@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
-import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
+import styles from "./page.module.css";
 
 type Tab = "overview" | "connect" | "keys" | "logs" | "config";
 type HostStatus = { id: string; socketId: string; lastSeen: string | null };
@@ -34,6 +34,14 @@ export default function ResourceDetailPage() {
   const [hosts, setHosts] = useState<HostStatus[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [rotatedToken, setRotatedToken] = useState<string | null>(null);
+
+  const refreshKeys = () => {
+    fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).then(setKeys).catch(() => {});
+  };
+
+  const revokeKey = (keyId: string) => {
+    void fetchJson(`/keys/${keyId}`, { method: "DELETE" }).then(refreshKeys).catch(() => {});
+  };
 
   useEffect(() => {
     void Promise.all([
@@ -66,10 +74,6 @@ export default function ResourceDetailPage() {
   }
 
   const endpoint = `${gatewayUrl}/r/${resource.id}`;
-  const curl = `curl -X POST ${endpoint}/query \\
-  -H "Authorization: Bearer ll_..." \\
-  -H "Content-Type: application/json" \\
-  -d '{"sql": "SELECT * FROM users LIMIT 10"}'`;
 
   return (
     <div className="page">
@@ -117,8 +121,7 @@ export default function ResourceDetailPage() {
             <div className="stat-card"><div className="stat-label"><Icon name="key" size={13} />API keys</div><div className="stat-value">{keys.length}</div><div className="stat-delta">authorized tokens</div></div>
             <div className="stat-card"><div className="stat-label"><Icon name="resources" size={13} />Resource</div><div className="stat-value" style={{ fontSize: 18 }}>{resource.active ? "Active" : "Inactive"}</div><div className="stat-delta">gateway routing</div></div>
           </div>
-          <EndpointSection endpoint={endpoint} curl={curl} />
-          <KeysSection keys={keys} onGenerateKey={openGenerateKey} />
+          <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />
           <RequestsTable logs={logs} />
         </>
       )}
@@ -133,45 +136,39 @@ export default function ResourceDetailPage() {
           }}
         />
       )}
-      {tab === "keys" && <KeysSection keys={keys} onGenerateKey={openGenerateKey} />}
+      {tab === "keys" && <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />}
       {tab === "logs" && <RequestsTable logs={logs} />}
       {tab === "config" && (
-        <div className="section">
-          <div className="section-head"><div><h3 className="section-title">Configuration</h3></div></div>
-          <dl className="kv-grid">
-            <dt>Resource ID</dt><dd>{resource.id}</dd>
-            <dt>Type</dt><dd>{resource.type}</dd>
-            <dt>Host ID</dt><dd>{resource.hostId}</dd>
-            <dt>Gateway URL</dt><dd>{endpoint}</dd>
-          </dl>
-        </div>
+        <ConfigSection
+          resource={resource}
+          endpoint={endpoint}
+          onSaved={(updated) => setResource((r) => r ? { ...r, config: updated.config } : r)}
+        />
       )}
     </div>
   );
 }
 
-function EndpointSection({ endpoint, curl }: { endpoint: string; curl: string }) {
-  return (
-    <div className="section">
-      <div className="section-head"><div><h3 className="section-title">Endpoint</h3><p className="section-sub">Public gateway URL for this resource.</p></div></div>
-      <div style={{ padding: 18 }}>
-        <div className="field-label">Gateway URL</div>
-        <div className="code"><span className="text">{endpoint}</span><CopyBtn /></div>
-        <div className="field-label" style={{ marginTop: 18 }}>Example request</div>
-        <pre className="code-block">{curl}</pre>
-      </div>
-    </div>
-  );
-}
-
 function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; rotatedToken: string | null; onRotate: () => Promise<void> }) {
-  const setupWithToken = rotatedToken
-    ? `pnpm --filter @locallink/host dev -- setup \\
-  --gateway ${gatewayUrl} \\
-  --token ${rotatedToken}`
-    : `pnpm --filter @locallink/host dev -- setup \\
-  --gateway ${gatewayUrl} \\
-  --token <regenerated token>`;
+  const tokenArg = rotatedToken ?? "<regenerated token>";
+  const setupSteps = [
+    {
+      number: 1,
+      label: "Configure gateway",
+      command: `pnpm --filter @locallink/host dev -- setup --gateway ${gatewayUrl}`
+    },
+    {
+      number: 2,
+      label: "Authenticate",
+      command: `append --token ${tokenArg}`
+    },
+    {
+      number: 3,
+      label: "Start the host",
+      command: "pnpm --filter @locallink/host dev -- start"
+    }
+  ];
+
   return (
     <div className="section">
       <div className="section-head">
@@ -183,11 +180,14 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
           <dt>Last seen</dt><dd>{host?.lastSeen ? formatDate(host.lastSeen) : "Never"}</dd>
           <dt>Socket</dt><dd>{host?.socketId ?? "-"}</dd>
         </dl>
-        <CommandBlock label={rotatedToken ? "Setup with new token" : "Setup wizard"} value={setupWithToken} />
+        <div style={{ display: "grid", gap: 14 }}>
+          {setupSteps.map((step) => (
+            <CommandStep key={step.number} number={step.number} label={step.label} command={step.command} />
+          ))}
+        </div>
         <p className="field-help" style={{ margin: 0 }}>
           The original token was shown only once. Regenerate a token here when you need to connect this resource again.
         </p>
-        <CommandBlock label="Start later" value="pnpm --filter @locallink/host dev -- start" />
         <button className="btn btn-secondary" type="button" onClick={() => void onRotate()} style={{ justifySelf: "start" }}>
           <Icon name="refresh" size={13} />Regenerate token
         </button>
@@ -196,16 +196,35 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
   );
 }
 
-function CommandBlock({ label, value }: { label: string; value: string }) {
+function CommandStep({ number, label, command }: { number: number; label: string; command: string }) {
   return (
-    <div>
-      <div className="field-label">{label}</div>
-      <pre className="code-block" style={{ margin: 0 }}>{value}</pre>
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <div
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          color: "var(--text-1)",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 12,
+          fontWeight: 700,
+          flexShrink: 0
+        }}
+      >
+        {number}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div className="field-label">{label}</div>
+        <pre className="code-block" style={{ margin: 0 }}>{command}</pre>
+      </div>
     </div>
   );
 }
 
-function KeysSection({ keys, onGenerateKey }: { keys: ApiKey[]; onGenerateKey: () => void }) {
+function KeysSection({ keys, onGenerateKey, onRevokeKey }: { keys: ApiKey[]; onGenerateKey: () => void; onRevokeKey: (id: string) => void }) {
   return (
     <div className="section">
       <div className="section-head">
@@ -221,10 +240,10 @@ function KeysSection({ keys, onGenerateKey }: { keys: ApiKey[]; onGenerateKey: (
               <td><span className="mono" style={{ fontSize: 12.5, color: "var(--text-2)" }}>{key.prefix}</span></td>
               <td style={{ color: "var(--text-2)", fontSize: 12.5 }}>{formatDate(key.createdAt ?? key.created)}</td>
               <td style={{ color: "var(--text-2)", fontSize: 12.5 }}>{key.lastUsed ? formatDate(key.lastUsed) : "Never"}</td>
-              <td><div className="row-actions"><button className="btn btn-ghost btn-sm" style={{ color: "var(--red)" }}>Revoke</button></div></td>
+              <td><div className="row-actions"><button className="btn btn-ghost btn-sm" style={{ color: "var(--red)" }} onClick={() => key.id && onRevokeKey(key.id)} disabled={!key.id}>Revoke</button></div></td>
             </tr>
           )) : (
-            <tr><td colSpan={5}><div className="empty"><div className="title">No API keys</div><div className="sub">Generate a key after connecting a resource.</div></div></td></tr>
+            <tr><td colSpan={5}><div className="empty"><div className="title">No API keys</div><div className="sub">Generate a key to start making requests.</div></div></td></tr>
           )}
         </tbody>
       </table>
@@ -254,6 +273,136 @@ function RequestsTable({ logs }: { logs: RequestLog[] }) {
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+type DbConfig = { engine: string; connectionString?: string; filePath?: string };
+type HttpConfig = { url: string; headers?: Record<string, string> };
+
+function ConfigSection({ resource, endpoint, onSaved }: { resource: Resource; endpoint: string; onSaved: (r: Resource) => void }) {
+  const config = resource.config as DbConfig | HttpConfig | null | undefined;
+  const isDb = resource.type === "database";
+  const isHttp = resource.type === "http-api";
+
+  const [configTab, setConfigTab] = useState<"local" | "gateway">("local");
+  const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
+  const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const newConfig = isDb
+        ? { engine: (config as DbConfig)?.engine ?? "postgres", connectionString: connStr }
+        : { url: httpUrl };
+      const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ config: newConfig })
+      });
+      onSaved(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <div><h3 className="section-title">Configuration</h3><p className="section-sub">Update connection details for this resource</p></div>
+      </div>
+      <div className={styles.configLayout}>
+        <div className={styles.configNav}>
+          <button
+            className={`${styles.configNavItem} ${configTab === "local" ? styles.active : ""}`}
+            type="button"
+            onClick={() => setConfigTab("local")}
+          >
+            <Icon name="server" size={13} />
+            Local Match
+          </button>
+          <button
+            className={`${styles.configNavItem} ${configTab === "gateway" ? styles.active : ""}`}
+            type="button"
+            onClick={() => setConfigTab("gateway")}
+          >
+            <Icon name="globe" size={13} />
+            Gateway
+          </button>
+        </div>
+
+        <div className={styles.configContent}>
+          {configTab === "local" ? (
+            <>
+          <h3>Local Match Configuration</h3>
+          <p>Update how the host agent connects to your local resource.</p>
+
+          {isDb && (
+            <div className="field">
+              <div className="field-label">Connection string</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  className="input"
+                  type={show ? "text" : "password"}
+                  value={connStr}
+                  onChange={e => setConnStr(e.target.value)}
+                  placeholder="postgresql://user:password@localhost:5432/dbname"
+                  style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
+                />
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShow(s => !s)} style={{ flexShrink: 0 }}>
+                  {show ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isHttp && (
+            <div className="field">
+              <div className="field-label">Base URL</div>
+              <input
+                className="input"
+                type="text"
+                value={httpUrl}
+                onChange={e => setHttpUrl(e.target.value)}
+                placeholder="http://localhost:8080"
+              />
+            </div>
+          )}
+
+          <div className="field-help">Changes take effect immediately — the host will use the new string on next query.</div>
+
+          {error && <div className="callout" style={{ color: "var(--red)" }}><Icon name="warn" size={14} />{error}</div>}
+
+          <div>
+            <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={saving}>
+              {saved ? <><Icon name="check" size={13} />Saved</> : saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+            </>
+          ) : null}
+
+          {configTab === "gateway" ? (
+            <>
+          <h3>Gateway Configuration</h3>
+          <p>Read-only identifiers used by external clients to reach this resource.</p>
+          <dl className="kv-grid" style={{ margin: 0 }}>
+            <dt>Resource ID</dt><dd className="mono" style={{ fontSize: 12 }}>{resource.id}</dd>
+            <dt>Type</dt><dd>{resource.type}</dd>
+            <dt>Gateway URL</dt><dd className="mono" style={{ fontSize: 12 }}>{endpoint}</dd>
+          </dl>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
