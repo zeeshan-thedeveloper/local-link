@@ -15,6 +15,7 @@ const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLI
 export default function DashboardPage() {
   const currentUser = useCurrentUser();
   const { openAddResource } = useOverlays();
+  const displayName = currentUser?.name?.trim() || displayNameFromEmail(currentUser?.email);
   const [resources, setResources] = useState<Resource[]>([]);
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const hasResources = resources.length > 0;
@@ -53,7 +54,7 @@ export default function DashboardPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Welcome, {displayNameFromEmail(currentUser?.email)}</h1>
+          <h1 className="page-title">Welcome, {displayName}</h1>
           <p className="page-sub">Overview of your local resources and gateway activity.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
