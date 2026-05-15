@@ -13,9 +13,14 @@ import { Topbar } from "./Topbar";
 
 const CurrentUserContext = createContext<CurrentUser | null>(null);
 const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
+const currentUserUpdatedEvent = "locallink:current-user-updated";
 
 export function useCurrentUser() {
   return useContext(CurrentUserContext);
+}
+
+export function notifyCurrentUserUpdated(user: CurrentUser) {
+  window.dispatchEvent(new CustomEvent<CurrentUser>(currentUserUpdatedEvent, { detail: user }));
 }
 
 function crumbsForPath(pathname: string) {
@@ -28,6 +33,7 @@ function crumbsForPath(pathname: string) {
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: CurrentUser | null }) {
   const pathname = usePathname();
+  const [user, setUser] = useState(currentUser);
   const [addOpen, setAddOpen] = useState(false);
   const [keyContext, setKeyContext] = useState<{ resourceId: string; onCreated?: () => void } | null>(null);
   const [connectHost, setConnectHost] = useState<{
@@ -40,6 +46,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     openAddResource: () => setAddOpen(true),
     openGenerateKey: (resourceId: string, onCreated?: () => void) => setKeyContext({ resourceId, onCreated }),
   }), []);
+
+  useEffect(() => {
+    setUser(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    const onUserUpdated = (event: Event) => {
+      setUser((event as CustomEvent<CurrentUser>).detail);
+    };
+
+    window.addEventListener(currentUserUpdatedEvent, onUserUpdated);
+    return () => window.removeEventListener(currentUserUpdatedEvent, onUserUpdated);
+  }, []);
 
   useEffect(() => {
     if (pathname === "/" || pathname.startsWith("/login")) return;
@@ -73,19 +92,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
 
   if (pathname === "/" || pathname.startsWith("/login")) {
     return (
-      <CurrentUserContext.Provider value={currentUser}>
+      <CurrentUserContext.Provider value={user}>
         <OverlayContextProvider value={overlayValue}>{children}</OverlayContextProvider>
       </CurrentUserContext.Provider>
     );
   }
 
   return (
-    <CurrentUserContext.Provider value={currentUser}>
+    <CurrentUserContext.Provider value={user}>
       <OverlayContextProvider value={overlayValue}>
         <div className="app">
           <Sidebar connectedHostCount={connectedHostCount} />
           <main className="main">
-            <Topbar crumbs={crumbsForPath(pathname)} currentUser={currentUser} />
+            <Topbar crumbs={crumbsForPath(pathname)} currentUser={user} />
             {children}
           </main>
         </div>
