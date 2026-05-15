@@ -45,7 +45,9 @@ app.get('/db/test', async (_req, res) => {
 // GET /users
 app.get('/users', async (_req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM users LIMIT 20');
+    const { rows } = await pool.query(
+      'SELECT id, name, email, "emailVerified", "createdAt" FROM "User" ORDER BY "createdAt" DESC LIMIT 20'
+    );
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -55,7 +57,10 @@ app.get('/users', async (_req, res) => {
 // GET /users/:id
 app.get('/users/:id', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    const { rows } = await pool.query(
+      'SELECT id, name, email, "emailVerified", "createdAt" FROM "User" WHERE id = $1',
+      [req.params.id]
+    );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (err) {
@@ -63,18 +68,114 @@ app.get('/users/:id', async (req, res) => {
   }
 });
 
-// POST /users
-app.post('/users', async (req, res) => {
-  const { name, email } = req.body ?? {};
-  if (!name || !email) {
-    return res.status(400).json({ error: 'name and email are required' });
-  }
+// GET /users/:id/sessions
+app.get('/users/:id/sessions', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
-      [name, email]
+      'SELECT id, "expiresAt", "ipAddress", "userAgent", "createdAt" FROM "Session" WHERE "userId" = $1 ORDER BY "createdAt" DESC',
+      [req.params.id]
     );
-    res.status(201).json(rows[0]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /resources
+app.get('/resources', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, name, type, "hostId", active, "createdAt" FROM "Resource" ORDER BY "createdAt" DESC'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /resources/active
+app.get('/resources/active', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, name, type, "hostId", active, "createdAt" FROM "Resource" WHERE active = true ORDER BY "createdAt" DESC'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /resources/:id
+app.get('/resources/:id', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, name, type, "hostId", active, "createdAt" FROM "Resource" WHERE id = $1',
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /resources/:id/keys
+app.get('/resources/:id/keys', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, name, prefix, "lastUsed", "createdAt" FROM "ApiKey" WHERE "resourceId" = $1',
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /logs
+app.get('/logs', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT l.id, l.method, l.path, l."statusCode", l."durationMs", l."createdAt", r.name AS "resourceName" FROM "RequestLog" l JOIN "Resource" r ON r.id = l."resourceId" ORDER BY l."createdAt" DESC LIMIT 50'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /logs/resource/:resourceId
+app.get('/logs/resource/:resourceId', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT l.id, l.method, l.path, l."statusCode", l."durationMs", l."createdAt", r.name AS "resourceName" FROM "RequestLog" l JOIN "Resource" r ON r.id = l."resourceId" WHERE l."resourceId" = $1 ORDER BY l."createdAt" DESC LIMIT 50',
+      [req.params.resourceId]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /logs/stats
+app.get('/logs/stats', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT r.name AS "resourceName", COUNT(*)::int AS total, AVG(l."durationMs")::int AS "avgMs", COUNT(*) FILTER (WHERE l."statusCode" >= 400)::int AS errors FROM "RequestLog" l JOIN "Resource" r ON r.id = l."resourceId" GROUP BY r.id, r.name ORDER BY total DESC'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /hosts
+app.get('/hosts', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, "socketId", "connectedAt", "lastSeen" FROM "ConnectedHost" ORDER BY "lastSeen" DESC'
+    );
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
