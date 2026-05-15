@@ -14,10 +14,10 @@ type ConnectHostModalProps = {
 export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }: ConnectHostModalProps) {
   if (!resource) return null;
 
-  const setup = `pnpm --filter @locallink/host dev -- setup \\
+  const setup = `pnpm --filter @locallink/cli dev -- setup \\
   --gateway ${gatewayUrl} \\
   --token ${token}`;
-  const start = "pnpm --filter @locallink/host dev -- start";
+  const start = "pnpm --filter @locallink/cli dev -- start";
   const all = [setup, start].join("\n\n");
 
   return (

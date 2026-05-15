@@ -5,6 +5,7 @@ export const gatewayUrl = process.env.GATEWAY_URL ?? "http://localhost:3003";
 export type CurrentUser = {
   email: string;
   id: string;
+  name?: string | null;
 };
 
 export async function gatewayFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -30,9 +31,9 @@ export async function gatewayFetch<T>(path: string, init: RequestInit = {}): Pro
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
-    const { user } = await gatewayFetch<{ user?: { email?: string; sub?: string } }>("/auth/me");
+    const { user } = await gatewayFetch<{ user?: { email?: string; sub?: string; id?: string; name?: string | null } }>("/auth/me");
     if (!user?.email || !user.sub) return null;
-    return { email: user.email, id: user.sub };
+    return { email: user.email, id: user.sub, name: user.name };
   } catch {
     return null;
   }

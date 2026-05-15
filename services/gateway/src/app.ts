@@ -22,6 +22,7 @@ type AppOptions = {
 };
 
 type LoginBody = { email: string; password: string };
+type UpdateCurrentUserBody = { name?: string };
 type ResourceParams = { id: string };
 type KeyParams = { id: string };
 type LogsQuery = { page?: string; limit?: string; resourceId?: string };
@@ -178,8 +179,35 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     return { ok: true };
   });
 
-  app.get("/auth/me", { preHandler: requireDashboardAuth }, async (request) => {
-    return { user: request.user };
+  app.get("/auth/me", { preHandler: requireDashboardAuth }, async (request, reply) => {
+    const authUser = request.user as { sub?: string; id?: string; email?: string };
+    const userId = authUser.sub ?? authUser.id;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true }
+    });
+    if (!user) return reply.code(404).send({ error: "User not found" });
+
+    return { user: { ...user, sub: user.id } };
+  });
+
+  app.patch<{ Body: UpdateCurrentUserBody }>("/auth/me", { preHandler: requireDashboardAuth }, async (request, reply) => {
+    const authUser = request.user as { sub?: string; id?: string };
+    const userId = authUser.sub ?? authUser.id;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    if (!name) return reply.code(400).send({ error: "Display name is required" });
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { name },
+      select: { id: true, email: true, name: true }
+    });
+
+    return { user: { ...user, sub: user.id } };
   });
 
   app.get("/hosts/me", async (request, reply) => {

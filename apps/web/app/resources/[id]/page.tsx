@@ -21,6 +21,7 @@ type GatewayRequestLog = Partial<RequestLog> & {
   durationMs: number;
   createdAt: string;
 };
+type LogPage = { items: RequestLog[]; page: number; limit: number; total: number };
 
 const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
@@ -30,10 +31,11 @@ export default function ResourceDetailPage() {
   const { openGenerateKey } = useOverlays();
   const [resource, setResource] = useState<Resource | null>(null);
   const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [logs, setLogs] = useState<RequestLog[]>([]);
+  const [logPage, setLogPage] = useState<LogPage>({ items: [], page: 1, limit: 10, total: 0 });
   const [hosts, setHosts] = useState<HostStatus[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [rotatedToken, setRotatedToken] = useState<string | null>(null);
+  const logLimit = 10;
 
   const refreshKeys = () => {
     fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).then(setKeys).catch(() => {});
@@ -43,19 +45,38 @@ export default function ResourceDetailPage() {
     void fetchJson(`/keys/${keyId}`, { method: "DELETE" }).then(refreshKeys).catch(() => {});
   };
 
+  const fetchLogs = (page: number) => {
+    fetchJson<{ items: GatewayRequestLog[]; page: number; limit: number; total: number }>(
+      `/logs?resourceId=${params.id}&page=${page}&limit=${logLimit}`
+    )
+      .then((data) => setLogPage({
+        items: data.items.map(normalizeLog),
+        page: data.page,
+        limit: data.limit,
+        total: data.total
+      }))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     void Promise.all([
       fetchJson<Resource & { type: ResourceType | "ai_model" | "http_api" }>(`/resources/${params.id}`),
-      fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).catch(() => []),
-      fetchJson<{ items: GatewayRequestLog[] }>(`/logs?resourceId=${params.id}&limit=20`).then((data) => data.items.map(normalizeLog)).catch(() => []),
-      fetchJson<{ hosts: HostStatus[] }>("/tunnel/status").then((data) => data.hosts).catch(() => [])
-    ]).then(([resource, keys, logs, hosts]) => {
+      fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).catch(() => [] as ApiKey[]),
+      fetchJson<{ items: GatewayRequestLog[]; page: number; limit: number; total: number }>(
+        `/logs?resourceId=${params.id}&page=1&limit=${logLimit}`
+      ).catch(() => ({ items: [] as GatewayRequestLog[], page: 1, limit: logLimit, total: 0 })),
+      fetchJson<{ hosts: HostStatus[] }>("/tunnel/status").then((data) => data.hosts).catch(() => [] as HostStatus[])
+    ]).then(([resource, keys, logsData, hosts]) => {
       setResource(normalizeResource(resource));
       setKeys(keys);
-      setLogs(logs);
+      setLogPage({ items: logsData.items.map(normalizeLog), page: 1, limit: logLimit, total: logsData.total });
       setHosts(hosts);
     });
   }, [params.id]);
+
+  const handleLogPageChange = (newPage: number) => {
+    fetchLogs(newPage);
+  };
 
   const host = useMemo(() => hosts.find((item) => item.id === resource?.id), [hosts, resource?.id]);
 
@@ -116,13 +137,13 @@ export default function ResourceDetailPage() {
       {tab === "overview" && (
         <>
           <div className="stat-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <div className="stat-card"><div className="stat-label"><Icon name="activity" size={13} />Requests</div><div className="stat-value">{logs.length}</div><div className="stat-delta">latest page</div></div>
+            <div className="stat-card"><div className="stat-label"><Icon name="activity" size={13} />Requests</div><div className="stat-value">{logPage.items.length}</div><div className="stat-delta">latest page</div></div>
             <div className="stat-card"><div className="stat-label"><Icon name="clock" size={13} />Last seen</div><div className="stat-value" style={{ fontSize: 18 }}>{host?.lastSeen ? formatDate(host.lastSeen) : "-"}</div><div className="stat-delta">{host ? "Host heartbeat received" : "Host offline"}</div></div>
             <div className="stat-card"><div className="stat-label"><Icon name="key" size={13} />API keys</div><div className="stat-value">{keys.length}</div><div className="stat-delta">authorized tokens</div></div>
             <div className="stat-card"><div className="stat-label"><Icon name="resources" size={13} />Resource</div><div className="stat-value" style={{ fontSize: 18 }}>{resource.active ? "Active" : "Inactive"}</div><div className="stat-delta">gateway routing</div></div>
           </div>
           <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />
-          <RequestsTable logs={logs} />
+          <RequestsTable logPage={logPage} onPageChange={handleLogPageChange} />
         </>
       )}
 
@@ -137,7 +158,7 @@ export default function ResourceDetailPage() {
         />
       )}
       {tab === "keys" && <KeysSection keys={keys} onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)} onRevokeKey={revokeKey} />}
-      {tab === "logs" && <RequestsTable logs={logs} />}
+      {tab === "logs" && <RequestsTable logPage={logPage} onPageChange={handleLogPageChange} />}
       {tab === "config" && (
         <ConfigSection
           resource={resource}
@@ -155,7 +176,7 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
     {
       number: 1,
       label: "Configure gateway",
-      command: `pnpm --filter @locallink/host dev -- setup --gateway ${gatewayUrl}`
+      command: `pnpm --filter @locallink/cli dev -- setup --gateway ${gatewayUrl}`
     },
     {
       number: 2,
@@ -165,7 +186,7 @@ function ConnectSection({ host, rotatedToken, onRotate }: { host?: HostStatus; r
     {
       number: 3,
       label: "Start the host",
-      command: "pnpm --filter @locallink/host dev -- start"
+      command: "pnpm --filter @locallink/cli dev -- start"
     }
   ];
 
@@ -251,27 +272,82 @@ function KeysSection({ keys, onGenerateKey, onRevokeKey }: { keys: ApiKey[]; onG
   );
 }
 
-function RequestsTable({ logs }: { logs: RequestLog[] }) {
+function RequestsTable({ logPage, onPageChange }: { logPage: LogPage; onPageChange: (page: number) => void }) {
+  const { items, page, limit, total } = logPage;
+  const hasKnownTotal = total > 0;
+  const totalPages = hasKnownTotal ? Math.max(1, Math.ceil(total / limit)) : page;
+  const showPagination = page > 1 || items.length > 0;
+  const canGoNext = hasKnownTotal ? page < totalPages : items.length >= limit;
+  const paginationControls = showPagination ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => onPageChange(page - 1)}
+        disabled={page <= 1}
+      >
+        Prev
+      </button>
+      <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>
+        {page} / {hasKnownTotal ? totalPages : "?"}
+      </span>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => onPageChange(page + 1)}
+        disabled={!canGoNext}
+      >
+        Next
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="section">
-      <div className="section-head"><div><h3 className="section-title">Request logs</h3></div></div>
-      {logs.length === 0 ? (
-        <div className="empty"><div className="icon-wrap"><Icon name="logs" size={18} /></div><div className="title">No request logs</div><div className="sub">Requests will appear here once this resource receives traffic.</div></div>
+      <div className="section-head">
+        <div>
+          <h3 className="section-title">Request logs</h3>
+          {total > 0 && (
+            <p className="section-sub">{total} total requests</p>
+          )}
+        </div>
+        {paginationControls}
+      </div>
+      {items.length === 0 ? (
+        <div className="empty">
+          <div className="icon-wrap"><Icon name="logs" size={18} /></div>
+          <div className="title">No request logs</div>
+          <div className="sub">Requests will appear here once this resource receives traffic.</div>
+        </div>
       ) : (
         <table className="tbl">
-          <thead><tr><th>Timestamp</th><th>Method</th><th>Path</th><th>Status</th><th style={{ textAlign: "right" }}>Duration</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Status</th>
+              <th style={{ textAlign: "right" }}>Duration</th>
+            </tr>
+          </thead>
           <tbody>
-            {logs.map((log) => (
-              <tr key={log.id ?? `${log.createdAt}-${log.path}`}>
-                <td className="mono" style={{ fontSize: 11.5, color: "var(--text-3)" }}>{formatDate(log.createdAt)}</td>
-                <td><span className={"method method-" + log.method}>{log.method}</span></td>
-                <td className="mono" style={{ fontSize: 12, color: "var(--text-1)" }}>{log.path}</td>
-                <td><span className="sc sc-2xx">{log.statusCode ?? log.status}</span></td>
-                <td className="num" style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{log.durationMs ?? log.dur}ms</td>
-              </tr>
-            ))}
+            {items.map((log) => {
+              const status = log.statusCode ?? log.status;
+              return (
+                <tr key={log.id ?? `${log.createdAt}-${log.path}`}>
+                  <td className="mono" style={{ fontSize: 11.5, color: "var(--text-3)" }}>{formatDate(log.createdAt)}</td>
+                  <td><span className={"method method-" + log.method}>{log.method}</span></td>
+                  <td className="mono" style={{ fontSize: 12, color: "var(--text-1)" }}>{log.path}</td>
+                  <td><span className={"sc sc-" + (status >= 500 ? "5xx" : status >= 400 ? "4xx" : "2xx")}>{status}</span></td>
+                  <td className="num" style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>{log.durationMs ?? log.dur}ms</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      )}
+      {paginationControls && items.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 18px", borderTop: "1px solid var(--border)" }}>
+          {paginationControls}
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { createApp } from "./app.js";
 
 function createPrismaMock() {
   const state = {
-    users: [] as Array<{ id: string; email: string; passwordHash: string }>,
+    users: [] as Array<{ id: string; email: string; name?: string; passwordHash: string }>,
     resources: [] as Array<Record<string, unknown>>,
     apiKeys: [] as Array<Record<string, unknown>>,
     logs: [] as Array<Record<string, unknown>>
@@ -13,12 +13,19 @@ function createPrismaMock() {
   return {
     state,
     user: {
-      findUnique: vi.fn(({ where }) => state.users.find((user) => user.email === where.email) ?? null),
+      findUnique: vi.fn(({ where }) =>
+        state.users.find((user) => user.email === where.email || user.id === where.id) ?? null
+      ),
       count: vi.fn(() => state.users.length),
       create: vi.fn(({ data }) => {
         const user = { id: "user_1", ...data };
         state.users.push(user);
         return user;
+      }),
+      update: vi.fn(({ where, data }) => {
+        const index = state.users.findIndex((user) => user.id === where.id);
+        state.users[index] = { ...state.users[index], ...data };
+        return state.users[index];
       })
     },
     resource: {
@@ -84,6 +91,38 @@ describe("gateway app", () => {
   it("creates the first single user on login", async () => {
     expect(prisma.state.users).toHaveLength(1);
     expect(cookie).toContain("locallink_session");
+  });
+
+  it("updates the current user's display name", async () => {
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send: vi.fn() }
+    });
+
+    const patch = await app.inject({
+      method: "PATCH",
+      url: "/auth/me",
+      headers: { cookie },
+      payload: { name: "Zeeshan" }
+    });
+
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json()).toMatchObject({
+      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" }
+    });
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: { cookie }
+    });
+
+    expect(me.json()).toMatchObject({
+      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" }
+    });
+
+    await app.close();
   });
 
   it("requires auth for resources", async () => {
