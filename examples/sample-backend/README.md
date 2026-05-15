@@ -37,7 +37,7 @@ npm run dev
 
 The server starts on `http://localhost:3000` unless you set a different `PORT`.
 
-## Routes
+## Available Routes
 
 Health check and connection info:
 
@@ -51,7 +51,7 @@ Raw database connectivity test:
 curl http://localhost:3000/db/test
 ```
 
-Fetch up to 20 users:
+List recent users:
 
 ```sh
 curl http://localhost:3000/users
@@ -60,15 +60,74 @@ curl http://localhost:3000/users
 Fetch one user by id:
 
 ```sh
-curl http://localhost:3000/users/1
+curl http://localhost:3000/users/cmox_user_id
 ```
 
-Create a user:
+Fetch sessions for a user:
 
 ```sh
-curl -X POST http://localhost:3000/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Ada Lovelace","email":"ada@example.com"}'
+curl http://localhost:3000/users/cmox_user_id/sessions
+```
+
+List all resources:
+
+```sh
+curl http://localhost:3000/resources
+```
+
+List active resources:
+
+```sh
+curl http://localhost:3000/resources/active
+```
+
+Fetch one resource by id:
+
+```sh
+curl http://localhost:3000/resources/cmoxj1aqb0001pp2m2drbgtkr
+```
+
+Fetch API keys for a resource:
+
+```sh
+curl http://localhost:3000/resources/cmoxj1aqb0001pp2m2drbgtkr/keys
+```
+
+List recent request logs:
+
+```sh
+curl http://localhost:3000/logs
+```
+
+List recent request logs for a resource:
+
+```sh
+curl http://localhost:3000/logs/resource/cmoxj1aqb0001pp2m2drbgtkr
+```
+
+Fetch request log stats grouped by resource:
+
+```sh
+curl http://localhost:3000/logs/stats
+```
+
+Example response:
+
+```json
+[
+  {
+    "resourceName": "LocalLink Gateway Database",
+    "total": 128,
+    "avgMs": 42,
+    "errors": 3
+  }
+]
+```
+
+List connected hosts:
+
+```sh
+curl http://localhost:3000/hosts
 ```
 
 ## How `fromEnv()` Works
@@ -77,7 +136,7 @@ The app imports `fromEnv()` from `@locallink/client/pg` and uses the returned po
 
 ```ts
 const pool = fromEnv();
-const { rows } = await pool.query('SELECT * FROM users LIMIT 20');
+const { rows } = await pool.query('SELECT now()::text, version()');
 ```
 
 `fromEnv()` reads the LocalLink environment variables and builds a Postgres-compatible pool that routes queries through the LocalLink gateway and resource you configured. That makes it useful for feature-flagging database access across environments: production can use a direct real `pg` connection, while development or staging can use a LocalLink tunnel without changing the query code.
