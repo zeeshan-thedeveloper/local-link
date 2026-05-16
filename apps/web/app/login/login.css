@@ -263,6 +263,9 @@
   color: var(--text-4);
   font-size: 11px;
 }
+.login-oauth-secondary {
+  margin-top: 10px;
+}
 .login-divider::before,
 .login-divider::after {
   content: "";
