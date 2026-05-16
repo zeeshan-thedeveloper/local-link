@@ -4,7 +4,7 @@ import { createApp } from "./app.js";
 
 function createPrismaMock() {
   const state = {
-    users: [] as Array<{ id: string; email: string; name?: string; passwordHash: string }>,
+    users: [] as Array<{ id: string; email: string; emailVerified?: boolean; name?: string; passwordHash: string }>,
     resources: [] as Array<Record<string, unknown>>,
     apiKeys: [] as Array<Record<string, unknown>>,
     logs: [] as Array<Record<string, unknown>>
@@ -26,6 +26,13 @@ function createPrismaMock() {
         const index = state.users.findIndex((user) => user.id === where.id);
         state.users[index] = { ...state.users[index], ...data };
         return state.users[index];
+      })
+    },
+    account: {
+      findFirst: vi.fn(({ where }) => {
+        const user = state.users.find((item) => item.id === where.userId);
+        if (!user?.passwordHash) return null;
+        return { password: user.passwordHash };
       })
     },
     resource: {
@@ -79,6 +86,12 @@ describe("gateway app", () => {
       jwtSecret: "test-secret",
       tunnel: { connectedHosts: () => [], send: vi.fn() }
     });
+    await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "me@example.com", password: "password" }
+    });
+    if (prisma.state.users[0]) prisma.state.users[0].emailVerified = true;
     const response = await app.inject({
       method: "POST",
       url: "/auth/login",
