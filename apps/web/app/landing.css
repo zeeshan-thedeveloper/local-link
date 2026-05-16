@@ -61,6 +61,17 @@ body.landing {
 }
 .l-nav-link:hover { color: var(--text-0); background: var(--bg-2); }
 .l-nav-cta { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.l-theme-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+.l-theme-btn:hover { color: var(--text-0); background: var(--bg-2); }
 
 /* ============ PAGE FRAME ============ */
 .l-frame {
@@ -731,4 +742,123 @@ h1.l-hero-title .mono {
   .l-nav-links { display: none; }
   .l-callout { flex-direction: column; align-items: flex-start; }
   .l-hero { padding: 64px 0 32px; }
+}
+
+/* ============ LIGHT MODE - LANDING ============ */
+[data-theme="light"] .l-nav-wrap {
+  background: rgba(245, 245, 247, 0.88);
+  border-bottom-color: rgba(0, 0, 0, 0.07);
+}
+[data-theme="light"] .l-nav-version {
+  background: #f0f0f4;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .l-frame::before {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+}
+[data-theme="light"] .l-frame::after {
+  background: radial-gradient(ellipse 60% 60% at 50% 30%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+}
+
+[data-theme="light"] .l-window {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.9) inset,
+    0 8px 32px -8px rgba(0,0,0,0.14),
+    0 0 0 1px rgba(0,0,0,0.06);
+  border-color: rgba(0, 0, 0, 0.09);
+}
+[data-theme="light"] .l-window-head {
+  background: #f5f5f7;
+  border-bottom-color: rgba(0,0,0,0.07);
+}
+[data-theme="light"] .l-window-dots span {
+  background: #e0e0e5;
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .l-window-tab {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.08);
+  color: #6b6b78;
+}
+[data-theme="light"] .l-window-head .pull { color: #9b9ba8; }
+
+/* Keep the preview panels dark - terminals always look better dark */
+[data-theme="light"] .l-preview-left,
+[data-theme="light"] .l-preview-right {
+  background: #16161f;
+}
+[data-theme="light"] .l-preview-left {
+  border-right-color: rgba(255,255,255,0.07);
+}
+[data-theme="light"] .l-preview-foot {
+  background: #111118;
+  border-top-color: rgba(255,255,255,0.07);
+}
+
+[data-theme="light"] .l-live-row {
+  background: #1d1d27;
+  border-color: rgba(255,255,255,0.07);
+}
+
+[data-theme="light"] .l-feat {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+}
+[data-theme="light"] .l-feat-art {
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.015));
+  border-top-color: rgba(0,0,0,0.07);
+}
+
+/* Keep feature art panels dark (terminal/code aesthetic) */
+[data-theme="light"] .l-art-tunnel .node {
+  background: #f5f5f7;
+  border-color: rgba(0,0,0,0.09);
+  color: #2c2c35;
+}
+[data-theme="light"] .l-art-res {
+  background: #f5f5f7;
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .l-art-res .name { color: #111114; }
+[data-theme="light"] .l-art-res .type {
+  border-color: rgba(0,0,0,0.08);
+  color: #6b6b78;
+}
+[data-theme="light"] .l-art-key {
+  background: #f5f5f7;
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .l-art-key .name { color: #6b6b78; }
+[data-theme="light"] .l-art-log { border-bottom-color: rgba(0,0,0,0.07); }
+
+[data-theme="light"] .l-quick {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .l-quick-code {
+  background: #f0f0f4;
+  border-color: rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .l-callout {
+  background:
+    radial-gradient(ellipse 100% 200% at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    #ffffff;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] .l-foot {
+  border-top-color: rgba(0,0,0,0.07);
+}
+
+[data-theme="light"] .l-eyebrow {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.09);
+  color: #6b6b78;
 }
