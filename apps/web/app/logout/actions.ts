@@ -16,5 +16,5 @@ export async function logout() {
     cookieStore.delete("locallink_session");
   }
 
-  redirect("/login");
+  redirect("/");
 }
