@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>LocalLink — Self-hosted API gateway for your local services</title>
+<meta name="description" content="LocalLink is a self-hosted, single-user API gateway. Expose local databases, AI models, and HTTP APIs over a secure tunnel — with scoped API keys and per-request logs."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+<link rel="stylesheet" href="landing.css"/>
+</head>
+<body class="landing" data-screen-label="01 Landing">
+
+<!-- ============ NAV ============ -->
+<div class="l-nav-wrap">
+  <nav class="l-nav">
+    <a class="l-nav-brand" href="Landing.html">
+      <span class="brand-mark"></span>
+      <span>LocalLink</span>
+      <span class="l-nav-version">v0.4.2</span>
+    </a>
+    <div class="l-nav-links">
+      <a class="l-nav-link" href="#features">Features</a>
+      <a class="l-nav-link" href="#quickstart">Quickstart</a>
+      <a class="l-nav-link" href="https://github.com">Docs</a>
+      <a class="l-nav-link" href="https://github.com">Changelog</a>
+    </div>
+    <div class="l-nav-cta">
+      <a class="btn btn-ghost btn-sm" href="https://github.com" aria-label="View on GitHub">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6C20.6 21.8 24 17.3 24 12c0-6.6-5.4-12-12-12z"/></svg>
+        <span>GitHub</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin-left:2px;">1.4k</span>
+      </a>
+      <a class="btn btn-primary btn-sm" href="LocalLink.html">
+        Open gateway
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </nav>
+</div>
+
+<!-- ============ HERO ============ -->
+<div class="l-frame">
+  <div class="l-container">
+    <section class="l-hero">
+      <div class="l-eyebrow">
+        <span class="dot"></span>
+        v0.4.2 <span class="sep">·</span> self-hosted <span class="sep">·</span> single-user <span class="sep">·</span> MIT
+      </div>
+
+      <h1 class="l-hero-title">
+        Your local services,<br/>
+        reachable on <span class="mono accent">https://</span>
+      </h1>
+
+      <p class="l-hero-sub">
+        A self-hosted gateway that exposes the databases, AI models, and HTTP APIs running on your machine — through a secure tunnel, with scoped keys and per-request logs.
+      </p>
+
+      <div class="l-hero-cta">
+        <a class="btn btn-primary" href="LocalLink.html">
+          Open gateway
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+        <a class="btn btn-secondary" href="https://github.com">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6C20.6 21.8 24 17.3 24 12c0-6.6-5.4-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="l-hero-meta">
+        <span>$ curl -fsSL get.locallink.dev | sh</span>
+        <span class="sep">·</span>
+        <span>no port forwarding</span>
+        <span class="sep">·</span>
+        <span>no cloud account</span>
+      </div>
+    </section>
+
+    <!-- ============ PRODUCT PREVIEW ============ -->
+    <div class="l-preview">
+      <div class="l-window">
+        <div class="l-window-head">
+          <div class="l-window-dots"><span></span><span></span><span></span></div>
+          <div class="l-window-tab">
+            <span class="dot"></span>
+            gateway.kestrel.io
+          </div>
+          <div class="pull">tunnel · 14m 22s uptime</div>
+        </div>
+        <div class="l-preview-body">
+          <!-- LEFT: host agent terminal -->
+          <div class="l-preview-left">
+            <p class="l-preview-label">
+              <span>Host agent</span>
+              <span class="badge">macbook-pro-m4</span>
+            </p>
+            <div class="l-term">
+              <div class="ln"><span class="prompt">$</span><span class="cmd">locallink up</span></div>
+              <div class="ln pad"><span class="arrow">→</span><span class="info">connecting to</span><span class="str">gateway.kestrel.io</span><span class="arrow">…</span></div>
+              <div class="ln pad"><span class="ok">✓</span><span class="info">tunnel established</span><span class="com">// WSS, AES-256-GCM</span></div>
+              <div class="ln"><span class="prompt">$</span><span class="cmd">locallink expose</span><span class="str">postgres-main</span><span class="flag">--port</span><span class="str">5432</span></div>
+              <div class="ln pad"><span class="ok">✓</span><span class="info">registered</span><span class="str">postgres-main</span><span class="com">// 2 keys</span></div>
+              <div class="ln"><span class="prompt">$</span><span class="cmd">locallink expose</span><span class="str">ollama-llama3</span><span class="flag">--port</span><span class="str">11434</span></div>
+              <div class="ln pad"><span class="ok">✓</span><span class="info">registered</span><span class="str">ollama-llama3</span><span class="com">// 1 key</span></div>
+              <div class="ln"><span class="prompt">$</span><span class="cmd">locallink status</span></div>
+              <div class="ln pad"><span class="info">3 resources</span><span class="arrow">·</span><span class="info">7 keys</span><span class="arrow">·</span><span class="ok">healthy</span></div>
+              <div class="ln"><span class="prompt">$</span><span class="caret"></span></div>
+            </div>
+          </div>
+
+          <!-- RIGHT: live request stream -->
+          <div class="l-preview-right">
+            <p class="l-preview-label">
+              <span>Live requests</span>
+              <span class="badge" id="l-live-count">last 6 · auto</span>
+            </p>
+            <div class="l-live-list" id="l-live-list">
+              <div class="l-live-row">
+                <span class="t">14:32:18</span>
+                <span class="m method-POST">POST</span>
+                <span class="p">/r/pgmain/query</span>
+                <span class="r">ll_pk_8h2j</span>
+                <span class="s sc-2xx">200</span>
+              </div>
+              <div class="l-live-row">
+                <span class="t">14:32:17</span>
+                <span class="m method-POST">POST</span>
+                <span class="p">/r/llama/api/generate</span>
+                <span class="r">ll_pk_8h2j</span>
+                <span class="s sc-2xx">200</span>
+              </div>
+              <div class="l-live-row">
+                <span class="t">14:32:15</span>
+                <span class="m method-GET">GET</span>
+                <span class="p">/r/redis/keys/session:9f2</span>
+                <span class="r">ll_pk_8h2j</span>
+                <span class="s sc-2xx">200</span>
+              </div>
+              <div class="l-live-row">
+                <span class="t">14:32:14</span>
+                <span class="m method-POST">POST</span>
+                <span class="p">/r/meili/indexes/docs/search</span>
+                <span class="r">ll_sk_4xv9</span>
+                <span class="s sc-2xx">200</span>
+              </div>
+              <div class="l-live-row">
+                <span class="t">14:32:13</span>
+                <span class="m method-POST">POST</span>
+                <span class="p">/r/pgmain/query</span>
+                <span class="r">ll_ci_n0vR</span>
+                <span class="s sc-4xx">401</span>
+              </div>
+              <div class="l-live-row">
+                <span class="t">14:32:12</span>
+                <span class="m method-POST">POST</span>
+                <span class="p">/r/pgmain/query</span>
+                <span class="r">ll_pk_8h2j</span>
+                <span class="s sc-2xx">200</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="l-preview-foot">
+          <span class="stat"><span class="pulse"></span><span class="v">tunnel live</span></span>
+          <span class="stat"><span class="k">requests/24h</span><span class="v">12,163</span></span>
+          <span class="stat"><span class="k">p50 latency</span><span class="v">28ms</span></span>
+          <span class="stat"><span class="k">resources</span><span class="v">6</span></span>
+          <span class="stat" style="margin-left:auto;"><span class="k">→</span><span class="v">gateway.kestrel.io</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FEATURES ============ -->
+<section class="l-section" id="features">
+  <div class="l-container">
+    <div class="l-section-head">
+      <p class="l-section-eyebrow">// What it does</p>
+      <h2 class="l-section-title">A gateway, not a tunnel.</h2>
+      <p class="l-section-sub">
+        Ngrok gives you a URL. LocalLink gives you a URL plus the access control and observability you'd build around it anyway.
+      </p>
+    </div>
+
+    <div class="l-feat-grid">
+      <!-- 1. Tunneling -->
+      <div class="l-feat">
+        <div class="l-feat-head">
+          <div class="l-feat-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>Secure tunneling</h3>
+          <span class="l-feat-num">01</span>
+        </div>
+        <p>Host agent opens an outbound encrypted WebSocket to your gateway. No port forwarding, no firewall changes, no public IP needed.</p>
+        <div class="l-feat-art">
+          <div class="l-art-tunnel">
+            <div class="node">
+              <span class="glyph">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </span>
+              localhost
+            </div>
+            <div class="link">
+              <span class="lock">WSS · AES-256</span>
+            </div>
+            <div class="node" style="justify-content:flex-end;">
+              gateway
+              <span class="glyph">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Resources -->
+      <div class="l-feat">
+        <div class="l-feat-head">
+          <div class="l-feat-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+          </div>
+          <h3>Resource management</h3>
+          <span class="l-feat-num">02</span>
+        </div>
+        <p>Register Postgres, Ollama, ComfyUI, or any HTTP service by name. Hot-reload on file save; URLs stay stable across restarts.</p>
+        <div class="l-feat-art">
+          <div class="l-art-resources">
+            <div class="l-art-res">
+              <span class="glyph db"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/></svg></span>
+              <span class="name">postgres-main</span>
+              <span class="type">database</span>
+              <span class="status"></span>
+            </div>
+            <div class="l-art-res">
+              <span class="glyph ai"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+              <span class="name">ollama-llama3</span>
+              <span class="type">ai model</span>
+              <span class="status"></span>
+            </div>
+            <div class="l-art-res">
+              <span class="glyph http"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18"/></svg></span>
+              <span class="name">internal-api</span>
+              <span class="type">http</span>
+              <span class="status idle"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Keys -->
+      <div class="l-feat">
+        <div class="l-feat-head">
+          <div class="l-feat-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8M16 3l4 4-2 2-4-4M14 7l3 3"/></svg>
+          </div>
+          <h3>Scoped API keys</h3>
+          <span class="l-feat-num">03</span>
+        </div>
+        <p>Issue keys scoped to specific resources and methods. Revoke instantly — propagates to the host agent in &lt;100ms.</p>
+        <div class="l-feat-art">
+          <div class="l-art-key">
+            <span class="name">production</span>
+            <span class="tok">ll_pk_8h2jaQ7mB4nXc1vR••••</span>
+            <span class="scope">rw · pgmain</span>
+          </div>
+          <div class="l-art-key revoked">
+            <span class="name">ci-runner</span>
+            <span class="tok">ll_ci_n0vR8tKwL2sP3aZ••••</span>
+            <span class="revoke">revoked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Logs -->
+      <div class="l-feat">
+        <div class="l-feat-head">
+          <div class="l-feat-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <h3>Request observability</h3>
+          <span class="l-feat-num">04</span>
+        </div>
+        <p>Every proxied request recorded: timestamp, method, path, status, latency, key. Filter, tail, export to your logging stack.</p>
+        <div class="l-feat-art">
+          <div class="l-art-logs">
+            <div class="l-art-log">
+              <span class="t">32:18</span><span class="m method-POST">POST</span><span class="p">/r/pgmain/query</span><span class="d sc-2xx">42ms</span>
+            </div>
+            <div class="l-art-log">
+              <span class="t">32:17</span><span class="m method-POST">POST</span><span class="p">/r/llama/api/generate</span><span class="d sc-2xx">1.84s</span>
+            </div>
+            <div class="l-art-log">
+              <span class="t">32:13</span><span class="m method-POST">POST</span><span class="p">/r/pgmain/query</span><span class="d sc-4xx">401</span>
+            </div>
+            <div class="l-art-log">
+              <span class="t">32:07</span><span class="m method-POST">POST</span><span class="p">/r/sdxl/prompt</span><span class="d sc-5xx">500</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUICKSTART ============ -->
+<section class="l-section" id="quickstart" style="padding-top:0;">
+  <div class="l-container">
+    <div class="l-section-head">
+      <p class="l-section-eyebrow">// 60 seconds</p>
+      <h2 class="l-section-title">Get the agent running.</h2>
+      <p class="l-section-sub">Three commands. The gateway runs on a $5 VPS (or your homelab); the agent runs on your laptop.</p>
+    </div>
+
+    <div class="l-quick-grid">
+      <div class="l-quick">
+        <div class="l-quick-step"><span class="num">01.</span>Install the agent</div>
+        <h4>Single binary, Mac / Linux / WSL.</h4>
+        <div class="l-quick-code">
+          <span class="p">$</span>
+          <span class="text">curl -fsSL get.locallink.dev | sh</span>
+          <span class="cp" title="Copy"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+        </div>
+        <p class="l-quick-note">Installs <span class="mono">locallink</span> to <span class="mono">/usr/local/bin</span>.</p>
+      </div>
+
+      <div class="l-quick">
+        <div class="l-quick-step"><span class="num">02.</span>Open the tunnel</div>
+        <h4>Authenticate once, stays connected.</h4>
+        <div class="l-quick-code">
+          <span class="p">$</span>
+          <span class="text">locallink login gateway.kestrel.io</span>
+          <span class="cp" title="Copy"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+        </div>
+        <p class="l-quick-note">Opens an outbound WebSocket. No firewall rules to change.</p>
+      </div>
+
+      <div class="l-quick">
+        <div class="l-quick-step"><span class="num">03.</span>Expose a resource</div>
+        <h4>Name it, point at a port, you're live.</h4>
+        <div class="l-quick-code">
+          <span class="p">$</span>
+          <span class="text">locallink expose postgres-dev --port 5432</span>
+          <span class="cp" title="Copy"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+        </div>
+        <p class="l-quick-note">Reachable at <span class="mono">/r/postgres-dev</span> with an auto-generated key.</p>
+      </div>
+    </div>
+
+    <div class="l-callout">
+      <div class="l-callout-text">
+        <h3>Already running an instance?</h3>
+        <p>Open the gateway dashboard to manage resources, rotate keys, and tail the request log.</p>
+      </div>
+      <div class="l-callout-cta">
+        <a class="btn btn-secondary" href="https://github.com">
+          Read the docs
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
+        </a>
+        <a class="btn btn-primary" href="LocalLink.html">
+          Open gateway
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="l-foot">
+  <div class="l-foot-inner">
+    <div class="l-foot-brand"><span class="brand-mark"></span>LocalLink</div>
+    <span class="sep">·</span>
+    <span>single-user instance</span>
+    <span class="sep">·</span>
+    <span>MIT licensed</span>
+    <span class="sep">·</span>
+    <a href="https://github.com">GitHub</a>
+    <span class="sep">·</span>
+    <a href="LocalLink.html">Sign in</a>
+    <div class="l-foot-meta">
+      <span>build · 8h2j4a</span>
+      <span>·</span>
+      <span>v0.4.2 · 2026-05-12</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Smooth scroll for hash links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href').slice(1);
+      const el = document.getElementById(id);
+      if (el) { e.preventDefault(); window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 56, behavior: 'smooth' }); }
+    });
+  });
+
+  // Live request stream: rotate a new row in periodically
+  (function() {
+    const list = document.getElementById('l-live-list');
+    if (!list) return;
+    const samples = [
+      { m: 'POST', mc: 'method-POST', p: '/r/pgmain/query',                 k: 'll_pk_8h2j', s: 200, sc: 'sc-2xx' },
+      { m: 'GET',  mc: 'method-GET',  p: '/r/redis/keys/user:1882',         k: 'll_pk_8h2j', s: 200, sc: 'sc-2xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/llama/api/embeddings',         k: 'll_sk_4xv9', s: 200, sc: 'sc-2xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/meili/indexes/docs/search',    k: 'll_sk_4xv9', s: 200, sc: 'sc-2xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/pgmain/query',                 k: 'll_ci_n0vR', s: 200, sc: 'sc-2xx' },
+      { m: 'DELETE', mc: 'method-DELETE', p: '/r/redis/keys/cache:old',     k: 'll_pk_8h2j', s: 200, sc: 'sc-2xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/llama/api/generate',           k: 'll_pk_8h2j', s: 200, sc: 'sc-2xx' },
+      { m: 'GET',  mc: 'method-GET',  p: '/r/meili/indexes/docs/stats',     k: 'll_sk_4xv9', s: 200, sc: 'sc-2xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/sdxl/prompt',                  k: 'll_sk_4xv9', s: 500, sc: 'sc-5xx' },
+      { m: 'POST', mc: 'method-POST', p: '/r/pgmain/query',                 k: 'll_pk_8h2j', s: 404, sc: 'sc-4xx' },
+    ];
+    let i = 0;
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function tick() {
+      const s = samples[i % samples.length];
+      i++;
+      const now = new Date();
+      const t = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      const row = document.createElement('div');
+      row.className = 'l-live-row new';
+      row.innerHTML =
+        '<span class="t">' + t + '</span>' +
+        '<span class="m ' + s.mc + '">' + s.m + '</span>' +
+        '<span class="p">' + s.p + '</span>' +
+        '<span class="r">' + s.k + '</span>' +
+        '<span class="s ' + s.sc + '">' + s.s + '</span>';
+      list.insertBefore(row, list.firstChild);
+      // Drop the .new class after the slide-in completes so the resting state is stable.
+      setTimeout(() => row.classList.remove('new'), 320);
+      while (list.children.length > 6) list.removeChild(list.lastChild);
+    }
+    setInterval(tick, 2400);
+  })();
+</script>
+
+</body>
+</html>

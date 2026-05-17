@@ -8,10 +8,12 @@ import {
 } from "@locallink/validators";
 import type { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { signJWT } from "better-auth/crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import { auth } from "./lib/auth.js";
+import { sendVerificationEmail } from "./lib/email.js";
 import { createApiKey, createHostToken, hashApiKey } from "./lib/keys.js";
 import type { TunnelBroker } from "./lib/tunnel.js";
 
@@ -47,14 +49,23 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }
   }
 
-  // If a second Google account tries to sign in, reject it.
+  // If a second OAuth account tries to sign in, reject it.
   // Only the first user to authenticate owns this instance.
   app.addHook("preHandler", async (request) => {
     if (!request.url.startsWith("/api/auth")) return;
-    if (!request.url.includes("/callback/google")) return;
+    if (!request.url.includes("/callback/google") && !request.url.includes("/callback/github")) return;
 
     oauthCallbackUserCounts.set(request, await prisma.user.count());
   });
+
+  async function sendDashboardVerificationEmail(email: string, request: FastifyRequest) {
+    const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL ?? "http://localhost:3000";
+    const secret = process.env.BETTER_AUTH_SECRET ?? "locallink-dev-secret";
+    const token = await signJWT({ email: email.toLowerCase() }, secret, 60 * 60 * 24);
+    const callbackURL = encodeURIComponent(`${frontendBaseUrl}/login?verified=1`);
+    await sendVerificationEmail(email, `${baseUrl}/api/auth/verify-email?token=${token}&callbackURL=${callbackURL}`);
+  }
 
   app.get("/api/auth/google", async (_request, reply) => {
     const frontendBaseUrl = process.env.FRONTEND_BASE_URL ?? "http://localhost:3000";
@@ -85,9 +96,44 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     return reply.type("text/html").send(html);
   });
 
+  app.get("/api/auth/github", async (_request, reply) => {
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL ?? "http://localhost:3000";
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Redirecting...</title></head><body>
+<script>
+(async () => {
+  try {
+    const res = await fetch('/api/auth/sign-in/social', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        provider: 'github',
+        callbackURL: ${JSON.stringify(`${frontendBaseUrl}/dashboard`)},
+        errorCallbackURL: ${JSON.stringify(`${frontendBaseUrl}/?error=single_user_instance`)}
+      })
+    });
+    const data = await res.json();
+    if (data.url) { window.location.href = data.url; }
+    else { window.location.href = ${JSON.stringify(`${frontendBaseUrl}/?error=oauth_redirect_failed`)}; }
+  } catch (e) {
+    window.location.href = ${JSON.stringify(`${frontendBaseUrl}/?error=oauth_redirect_failed`)};
+  }
+})();
+</script>
+<p>Redirecting to GitHub...</p>
+</body></html>`;
+    return reply.type("text/html").send(html);
+  });
+
   app.all("/api/auth/*", async (request, reply) => {
     const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
     const url = new URL(request.raw.url ?? "/", baseUrl);
+    if (request.method === "POST" && url.pathname === "/api/auth/sign-up/email" && (await prisma.user.count()) >= 1) {
+      return reply.code(403).send({ error: "single_user_instance" });
+    }
+    if (request.method === "POST" && url.pathname === "/api/auth/forget-password") {
+      url.pathname = "/api/auth/request-password-reset";
+    }
     const hasBody = request.method !== "GET" && request.method !== "HEAD";
     const body =
       hasBody && typeof request.body === "string"
@@ -154,13 +200,36 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     const userCount = await prisma.user.count();
 
     if (!user && userCount === 0) {
+      const passwordHash = await bcrypt.hash(password, 12);
       user = await prisma.user.create({
-        data: { email, passwordHash: await bcrypt.hash(password, 12) }
+        data: {
+          email,
+          passwordHash,
+          accounts: {
+            create: {
+              accountId: email,
+              providerId: "credential",
+              password: passwordHash
+            }
+          }
+        }
       });
+      await sendDashboardVerificationEmail(user.email, request);
     }
 
-    if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+    const credentialAccount = user
+      ? await prisma.account.findFirst({
+          where: { userId: user.id, providerId: "credential", password: { not: null } },
+          select: { password: true }
+        })
+      : null;
+    const storedPassword = credentialAccount?.password ?? user?.passwordHash;
+    if (!user || !storedPassword || !(await bcrypt.compare(password, storedPassword))) {
       return reply.code(401).send({ error: "Invalid credentials" });
+    }
+    if (!user.emailVerified) {
+      await sendDashboardVerificationEmail(user.email, request);
+      return reply.code(403).send({ error: "Email verification required" });
     }
 
     const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: "7d" });
