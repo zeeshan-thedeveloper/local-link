@@ -3,7 +3,6 @@
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { Icon } from "@/components/ui/Icon";
 import type { CurrentUser } from "@/lib/gateway";
-import { logout } from "@/app/logout/actions";
 
 function initialsForUser(label: string, email: string) {
   const source = label || email.split("@")[0] || "";
@@ -37,7 +36,7 @@ export function Topbar({ crumbs, currentUser }: { crumbs: string[]; currentUser:
         <div className="user-menu">
           <div className="avatar">{initialsForUser(userLabel, userEmail)}</div>
           <span title={userEmail}>{userLabel}</span>
-          <form action={logout}>
+          <form action="/logout" method="post">
             <button type="submit" className="btn btn-ghost btn-sm" aria-label="Log out">
               <Icon name="logout" size={13}/>
             </button>
