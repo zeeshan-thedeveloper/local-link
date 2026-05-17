@@ -459,6 +459,10 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     return { items, page, limit, total };
   });
 
+  app.get("/health", async () => {
+    return { status: "ok", uptime: process.uptime() };
+  });
+
   app.get("/tunnel/status", { preHandler: requireDashboardAuth }, async () => {
     return { hosts: tunnel.connectedHosts() };
   });
