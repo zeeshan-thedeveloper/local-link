@@ -14,5 +14,5 @@ export async function POST(request: Request) {
     cookieStore.delete("locallink_session");
   }
 
-  return NextResponse.redirect(new URL("/login", request.url));
+  return NextResponse.redirect(new URL("/", request.url));
 }
