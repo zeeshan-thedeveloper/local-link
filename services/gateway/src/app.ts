@@ -30,6 +30,7 @@ type KeyParams = { id: string };
 type LogsQuery = { page?: string; limit?: string; resourceId?: string };
 
 const sessionCookieName = "locallink_session";
+const cookieDomain = process.env.COOKIE_DOMAIN ?? undefined;
 
 export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   const app = Fastify({ logger: true });
@@ -186,6 +187,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
+        domain: cookieDomain,
         maxAge: 60 * 60 * 24 * 7
       });
     }
@@ -238,13 +240,14 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
+      domain: cookieDomain,
       maxAge: 60 * 60 * 24 * 7
     });
     return { user: { id: user.id, email: user.email } };
   });
 
   app.post("/auth/logout", async (_request, reply) => {
-    reply.clearCookie(sessionCookieName, { path: "/" });
+    reply.clearCookie(sessionCookieName, { path: "/", domain: cookieDomain });
     return { ok: true };
   });
 
