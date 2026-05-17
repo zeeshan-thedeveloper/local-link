@@ -155,6 +155,7 @@ type HostLookup = {
   resourceId: string;
   name: string;
   type: HostResourceConfig["type"];
+  config?: HostResourceConfig["config"];
   gatewayUrl?: string;
 };
 
@@ -172,27 +173,44 @@ async function verifyHostToken(gatewayUrl: string, token: string): Promise<HostL
 
 async function promptForResourceConfig(host: HostLookup, existing?: HostResourceConfig): Promise<HostResourceConfig["config"]> {
   if (host.type === "database") {
-    const existingConnectionString =
-      existing?.type === "database" ? existing.config.connectionString : undefined;
+    const serverConnectionString = host.config?.type === "database" ? host.config.connectionString : undefined;
+    const existingConnectionString = existing?.type === "database" ? existing.config.connectionString : undefined;
+    const defaultConnectionString = existingConnectionString ?? serverConnectionString;
+    if (defaultConnectionString) {
+      process.stdout.write(`Using connection string from gateway config.\n`);
+      return { type: "database", engine: "postgres", connectionString: defaultConnectionString };
+    }
     const connectionString = await input({
       message: "Postgres connection string:",
-      default: existingConnectionString ?? "postgresql://locallink:locallink@localhost:5433/locallink"
+      default: "postgresql://locallink:locallink@localhost:5433/locallink"
     });
     return { type: "database", engine: "postgres", connectionString };
   }
   if (host.type === "http-api") {
+    const serverUrl = host.config?.type === "http-api" ? host.config.url : undefined;
     const existingUrl = existing?.type === "http-api" ? existing.config.url : undefined;
+    const defaultUrl = existingUrl ?? serverUrl;
+    if (defaultUrl) {
+      process.stdout.write(`Using URL from gateway config.\n`);
+      return { type: "http-api", url: defaultUrl };
+    }
     const url = await input({
       message: "Local HTTP base URL:",
-      default: existingUrl ?? "http://localhost:3000"
+      default: "http://localhost:3000"
     });
     return { type: "http-api", url };
   }
 
+  const serverBaseUrl = host.config?.type === "ai-model" ? host.config.baseUrl : undefined;
   const existingBaseUrl = existing?.type === "ai-model" ? existing.config.baseUrl : undefined;
+  const defaultBaseUrl = existingBaseUrl ?? serverBaseUrl;
+  if (defaultBaseUrl) {
+    process.stdout.write(`Using base URL from gateway config.\n`);
+    return { type: "ai-model", provider: "openai-compatible", baseUrl: defaultBaseUrl, model: host.name };
+  }
   const baseUrl = await input({
     message: "Local model base URL:",
-    default: existingBaseUrl ?? "http://localhost:11434"
+    default: "http://localhost:11434"
   });
   return { type: "ai-model", provider: "openai-compatible", baseUrl, model: host.name };
 }
