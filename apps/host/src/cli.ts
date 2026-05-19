@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 import { confirm, input, password } from "@inquirer/prompts";
 import { Command } from "commander";
-import {
-  createDefaultConfig,
-  loadConfig,
-  saveConfig,
-  type HostResourceConfig
-} from "./config.js";
+import { createDefaultConfig, loadConfig, saveConfig, type HostResourceConfig } from "./config.js";
 import { startDaemon, type DaemonEvent } from "./daemon.js";
 
 const program = new Command();
@@ -31,12 +26,14 @@ program
         name: host.name,
         type: host.type,
         token: options.token,
-        config: existing?.config ?? defaultResourceConfig(host.type)
-      } as HostResourceConfig
+        config: existing?.config ?? defaultResourceConfig(host.type),
+      } as HostResourceConfig,
     ];
     await saveConfig(config);
     process.stdout.write(`Initialized resource '${host.name}' (id: ${host.resourceId})\n`);
-    process.stdout.write(`Run \`locallink register --id ${host.resourceId} ...\` to set local connection details.\n`);
+    process.stdout.write(
+      `Run \`locallink register --id ${host.resourceId} ...\` to set local connection details.\n`,
+    );
     process.stdout.write("Run `locallink start` to connect.\n");
   });
 
@@ -49,16 +46,16 @@ program
     const existingConfig = await loadExistingConfig();
     const gatewayUrl = trimTrailingSlash(
       options.gateway ??
-        await input({
+        (await input({
           message: "Gateway URL:",
-          default: existingConfig?.gatewayUrl ?? "http://localhost:3003"
-        })
+          default: existingConfig?.gatewayUrl ?? "http://localhost:3003",
+        })),
     );
     const token =
       options.token ??
-      await password({
-        message: "Host token (from the dashboard):"
-      });
+      (await password({
+        message: "Host token (from the dashboard):",
+      }));
 
     process.stdout.write("Verifying token...\n");
     const host = await verifyHostToken(gatewayUrl, token);
@@ -72,14 +69,23 @@ program
 
     config.resources = [
       ...config.resources.filter((resource) => resource.id !== host.resourceId),
-      { id: host.resourceId, name: host.name, type: host.type, token, config: resourceConfig } as HostResourceConfig
+      {
+        id: host.resourceId,
+        name: host.name,
+        type: host.type,
+        token,
+        config: resourceConfig,
+      } as HostResourceConfig,
     ];
     await saveConfig(config);
     process.stdout.write(`Saved config for '${host.name}'.\n`);
 
     const shouldStart = await confirm({ message: "Start the tunnel now?", default: true });
     if (shouldStart) {
-      renderDashboard(config.gatewayUrl, config.resources.map((r) => r.name));
+      renderDashboard(
+        config.gatewayUrl,
+        config.resources.map((r) => r.name),
+      );
       startDaemon(config, (event) => logDaemonEvent(event));
     } else {
       process.stdout.write("Run `locallink start` when ready.\n");
@@ -88,7 +94,10 @@ program
 
 program.command("start").action(async () => {
   const config = await loadConfig();
-  renderDashboard(config.gatewayUrl, config.resources.map((r) => r.name));
+  renderDashboard(
+    config.gatewayUrl,
+    config.resources.map((r) => r.name),
+  );
   startDaemon(config, (event) => logDaemonEvent(event));
 });
 
@@ -96,12 +105,15 @@ program
   .command("register")
   .requiredOption("--id <id>", "Resource id from the gateway")
   .option("--name <name>", "Display name")
-  .option("--type <type>", "database, ai-model, or http-api")
-  .option("--url <url>", "Local HTTP or model base URL")
+  .option("--type <type>", "database or http-api")
+  .option("--url <url>", "Local HTTP base URL")
   .option("--connection-string <url>", "Postgres connection string")
   .action(async (options: Record<string, string>) => {
     const config = await loadConfig();
-    const resource = toResource(options, config.resources.find((item) => item.id === options.id));
+    const resource = toResource(
+      options,
+      config.resources.find((item) => item.id === options.id),
+    );
     config.resources = [...config.resources.filter((item) => item.id !== resource.id), resource];
     await saveConfig(config);
     process.stdout.write(`Registered ${resource.name} (${resource.id})\n`);
@@ -143,11 +155,11 @@ program.command("status").action(async () => {
     JSON.stringify(
       {
         gatewayUrl: config.gatewayUrl,
-        resources: config.resources.map(({ id, name, type }) => ({ id, name, type }))
+        resources: config.resources.map(({ id, name, type }) => ({ id, name, type })),
       },
       null,
-      2
-    ) + "\n"
+      2,
+    ) + "\n",
   );
 });
 
@@ -161,20 +173,27 @@ type HostLookup = {
 
 async function verifyHostToken(gatewayUrl: string, token: string): Promise<HostLookup | null> {
   const response = await fetch(`${trimTrailingSlash(gatewayUrl)}/hosts/me`, {
-    headers: { authorization: `Bearer ${token}` }
+    headers: { authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    process.stderr.write(`Failed to verify host token: ${response.status} ${response.statusText}\n`);
+    process.stderr.write(
+      `Failed to verify host token: ${response.status} ${response.statusText}\n`,
+    );
     process.exitCode = 1;
     return null;
   }
   return response.json() as Promise<HostLookup>;
 }
 
-async function promptForResourceConfig(host: HostLookup, existing?: HostResourceConfig): Promise<HostResourceConfig["config"]> {
+async function promptForResourceConfig(
+  host: HostLookup,
+  existing?: HostResourceConfig,
+): Promise<HostResourceConfig["config"]> {
   if (host.type === "database") {
-    const serverConnectionString = host.config?.type === "database" ? host.config.connectionString : undefined;
-    const existingConnectionString = existing?.type === "database" ? existing.config.connectionString : undefined;
+    const serverConnectionString =
+      host.config?.type === "database" ? host.config.connectionString : undefined;
+    const existingConnectionString =
+      existing?.type === "database" ? existing.config.connectionString : undefined;
     const defaultConnectionString = existingConnectionString ?? serverConnectionString;
     if (defaultConnectionString) {
       process.stdout.write(`Using connection string from gateway config.\n`);
@@ -182,7 +201,7 @@ async function promptForResourceConfig(host: HostLookup, existing?: HostResource
     }
     const connectionString = await input({
       message: "Postgres connection string:",
-      default: "postgresql://locallink:locallink@localhost:5433/locallink"
+      default: "postgresql://locallink:locallink@localhost:5433/locallink",
     });
     return { type: "database", engine: "postgres", connectionString };
   }
@@ -196,7 +215,7 @@ async function promptForResourceConfig(host: HostLookup, existing?: HostResource
     }
     const url = await input({
       message: "Local HTTP base URL:",
-      default: "http://localhost:3000"
+      default: "http://localhost:3000",
     });
     return { type: "http-api", url };
   }
@@ -206,16 +225,24 @@ async function promptForResourceConfig(host: HostLookup, existing?: HostResource
   const defaultBaseUrl = existingBaseUrl ?? serverBaseUrl;
   if (defaultBaseUrl) {
     process.stdout.write(`Using base URL from gateway config.\n`);
-    return { type: "ai-model", provider: "openai-compatible", baseUrl: defaultBaseUrl, model: host.name };
+    return {
+      type: "ai-model",
+      provider: "openai-compatible",
+      baseUrl: defaultBaseUrl,
+      model: host.name,
+    };
   }
   const baseUrl = await input({
-    message: "Local model base URL:",
-    default: "http://localhost:11434"
+    message: "Local HTTP base URL:",
+    default: "http://localhost:3000",
   });
   return { type: "ai-model", provider: "openai-compatible", baseUrl, model: host.name };
 }
 
-function toResource(options: Record<string, string | undefined>, existing?: HostResourceConfig): HostResourceConfig {
+function toResource(
+  options: Record<string, string | undefined>,
+  existing?: HostResourceConfig,
+): HostResourceConfig {
   const id = requireOption(options.id, "--id");
   if (!existing) throw new Error(`Resource ${id} is not initialized. Run locallink init first.`);
 
@@ -228,30 +255,21 @@ function toResource(options: Record<string, string | undefined>, existing?: Host
       name,
       type: "http-api",
       token: existing.token,
-      config: { type: "http-api", url: options.url }
+      config: { type: "http-api", url: options.url },
     };
   }
   if (type === "database") {
-    if (!options.connectionString) throw new Error("--connection-string is required for database resources");
+    if (!options.connectionString)
+      throw new Error("--connection-string is required for database resources");
     return {
       id,
       name,
       type: "database",
       token: existing.token,
-      config: { type: "database", engine: "postgres", connectionString: options.connectionString }
+      config: { type: "database", engine: "postgres", connectionString: options.connectionString },
     };
   }
-  if (type === "ai-model") {
-    if (!options.url) throw new Error("--url is required for ai-model resources");
-    return {
-      id,
-      name,
-      type: "ai-model",
-      token: existing.token,
-      config: { type: "ai-model", provider: "openai-compatible", baseUrl: options.url, model: name }
-    };
-  }
-  throw new Error("Unsupported resource type");
+  throw new Error("Unsupported resource type. Use database or http-api.");
 }
 
 function requireOption(value: string | undefined, name: string) {
@@ -276,9 +294,19 @@ async function loadExistingConfig() {
 
 function defaultResourceConfig(type: HostResourceConfig["type"]): HostResourceConfig["config"] {
   if (type === "database") {
-    return { type: "database", engine: "postgres", connectionString: "postgresql://locallink:locallink@localhost:5433/locallink" };
+    return {
+      type: "database",
+      engine: "postgres",
+      connectionString: "postgresql://locallink:locallink@localhost:5433/locallink",
+    };
   }
-  if (type === "ai-model") return { type: "ai-model", provider: "openai-compatible", baseUrl: "http://localhost:11434", model: "local" };
+  if (type === "ai-model")
+    return {
+      type: "ai-model",
+      provider: "openai-compatible",
+      baseUrl: "http://localhost:3000",
+      model: "local",
+    };
   return { type: "http-api", url: "http://localhost:3000" };
 }
 
@@ -290,14 +318,16 @@ const C = {
   red: "\x1b[31m",
   yellow: "\x1b[33m",
   cyan: "\x1b[36m",
-  gray: "\x1b[90m"
+  gray: "\x1b[90m",
 };
 
 function renderDashboard(gatewayUrl: string, resourceNames: string[]) {
   const w = process.stdout.columns || 72;
   const line = "─".repeat(w);
   process.stdout.write("\x1bc"); // clear screen
-  process.stdout.write(`${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${gatewayUrl}${C.reset}\n`);
+  process.stdout.write(
+    `${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${gatewayUrl}${C.reset}\n`,
+  );
   process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
   process.stdout.write(`${C.bold}  Tunnels${C.reset}\n`);
   for (const name of resourceNames) {
@@ -310,16 +340,26 @@ function renderDashboard(gatewayUrl: string, resourceNames: string[]) {
 function logDaemonEvent(event: DaemonEvent) {
   const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
   if (event.type === "connected") {
-    process.stdout.write(`  ${C.green}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.green}connected${C.reset}\n`);
-  } else if (event.type === "disconnected") {
-    process.stdout.write(`  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}disconnected${C.reset}\n`);
-  } else if (event.type === "connect_error") {
-    process.stdout.write(`  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}error: ${event.message}${C.reset}\n`);
-  } else {
-    const statusColor = event.statusCode < 300 ? C.green : event.statusCode < 500 ? C.yellow : C.red;
-    const dur = event.durationMs < 1000 ? `${event.durationMs}ms` : `${(event.durationMs / 1000).toFixed(1)}s`;
     process.stdout.write(
-      `  ${C.gray}${ts}${C.reset}  ${C.dim}${event.resource.name}${C.reset}  ${C.bold}${event.method.padEnd(6)}${C.reset}  ${event.path}  ${statusColor}${event.statusCode}${C.reset}  ${C.dim}${dur}${C.reset}\n`
+      `  ${C.green}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.green}connected${C.reset}\n`,
+    );
+  } else if (event.type === "disconnected") {
+    process.stdout.write(
+      `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}disconnected${C.reset}\n`,
+    );
+  } else if (event.type === "connect_error") {
+    process.stdout.write(
+      `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}error: ${event.message}${C.reset}\n`,
+    );
+  } else {
+    const statusColor =
+      event.statusCode < 300 ? C.green : event.statusCode < 500 ? C.yellow : C.red;
+    const dur =
+      event.durationMs < 1000
+        ? `${event.durationMs}ms`
+        : `${(event.durationMs / 1000).toFixed(1)}s`;
+    process.stdout.write(
+      `  ${C.gray}${ts}${C.reset}  ${C.dim}${event.resource.name}${C.reset}  ${C.bold}${event.method.padEnd(6)}${C.reset}  ${event.path}  ${statusColor}${event.statusCode}${C.reset}  ${C.dim}${dur}${C.reset}\n`,
     );
   }
 }

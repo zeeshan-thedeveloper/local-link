@@ -34,4 +34,5 @@ pnpm --filter @locallink/host dev init --gateway http://localhost:3003 --token l
 pnpm --filter @locallink/host dev register --id <resource-id> --type http-api --url http://localhost:3000
 pnpm --filter @locallink/host dev start
 ```
-Make your local databases, AI models, and HTTP services accessible from anywhere. No port forwarding. No sharing credentials. Just a tunnel and an API k
+
+Make local Postgres databases and HTTP services accessible through your own gateway. No port forwarding. No sharing upstream credentials. Just a tunnel and scoped API keys.

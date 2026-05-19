@@ -17,24 +17,31 @@ export async function createResource(formData: FormData) {
   const type = String(formData.get("type") ?? "database") as ResourceType;
   const localUrl = String(formData.get("localUrl") ?? "").trim();
   const connectionString = String(formData.get("connectionString") ?? "").trim();
+  if (type !== "database" && type !== "http-api") {
+    throw new Error("Unsupported resource type");
+  }
 
   const config =
     type === "database"
-      ? { engine: "postgres", connectionString: connectionString || "postgresql://localhost:5432/app" }
-      : type === "ai-model"
-        ? { provider: "openai-compatible", baseUrl: localUrl || "http://localhost:11434", model: name || "local" }
-        : { url: localUrl || "http://localhost:3000" };
+      ? {
+          engine: "postgres",
+          connectionString: connectionString || "postgresql://localhost:5432/app",
+        }
+      : { url: localUrl || "http://localhost:3000" };
 
-  const created = await gatewayFetch<{ resource: GatewayResource; hostToken: string }>("/resources", {
-    method: "POST",
-    body: JSON.stringify({ name, type, hostId: "pending", config })
-  });
+  const created = await gatewayFetch<{ resource: GatewayResource; hostToken: string }>(
+    "/resources",
+    {
+      method: "POST",
+      body: JSON.stringify({ name, type, hostId: "pending", config }),
+    },
+  );
   return {
     ...created,
     resource: {
       ...created.resource,
-      type: normalizeResourceType(created.resource.type)
-    }
+      type: normalizeResourceType(created.resource.type),
+    },
   };
 }
 
