@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /app
 RUN corepack enable
 
@@ -17,7 +17,7 @@ COPY . .
 ENV NEXT_OUTPUT_STANDALONE=1
 RUN pnpm --filter @locallink/web... build
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && \
