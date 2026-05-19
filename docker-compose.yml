@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: locallink
       POSTGRES_USER: locallink
@@ -16,30 +17,49 @@ services:
       retries: 10
 
   gateway:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: services/gateway/Dockerfile
     environment:
-      DATABASE_URL: postgresql://locallink:locallink@postgres:5432/locallink?schema=public
-      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       PORT: 3003
-      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-replace-with-google-client-id}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-replace-with-google-client-secret}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-locallink-dev-secret-change-in-production}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?GITHUB_CLIENT_ID is required}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?GITHUB_CLIENT_SECRET is required}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY is required}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3005}
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://localhost:3003}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
     ports:
       - "3003:3003"
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+        reservations:
+          cpus: "0.25"
+          memory: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     environment:
-      GATEWAY_URL: http://gateway:3003
+      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:3003}
       NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3003}
       PORT: 3000
@@ -47,6 +67,19 @@ services:
       - "${WEB_PORT:-3005}:3000"
     depends_on:
       - gateway
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+        reservations:
+          cpus: "0.1"
+          memory: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres-data:

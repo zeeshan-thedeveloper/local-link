@@ -4,7 +4,7 @@ import jwt from "@fastify/jwt";
 import {
   apiKeyCreationSchema,
   resourceRegistrationSchema,
-  resourceUpdateSchema
+  resourceUpdateSchema,
 } from "@locallink/validators";
 import type { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -16,6 +16,7 @@ import { auth } from "./lib/auth.js";
 import { sendVerificationEmail } from "./lib/email.js";
 import { createApiKey, createHostToken, hashApiKey } from "./lib/keys.js";
 import type { TunnelBroker } from "./lib/tunnel.js";
+import { healthRoutes } from "./routes/health.js";
 
 type AppOptions = {
   prisma: PrismaClient;
@@ -33,14 +34,28 @@ const sessionCookieName = "locallink_session";
 const cookieDomain = process.env.COOKIE_DOMAIN ?? undefined;
 
 export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL ?? "info",
+      ...(process.env.NODE_ENV !== "production"
+        ? {
+            transport: {
+              target: "pino-pretty",
+              options: { colorize: true, translateTime: "HH:MM:ss" },
+            },
+          }
+        : {}),
+    },
+    genReqId: () => randomUUID(),
+  });
   const oauthCallbackUserCounts = new WeakMap<FastifyRequest, number>();
   await app.register(cors, { origin: true, credentials: true });
   await app.register(cookie);
   await app.register(jwt, {
     secret: jwtSecret,
-    cookie: { cookieName: sessionCookieName, signed: false }
+    cookie: { cookieName: sessionCookieName, signed: false },
   });
+  await app.register(healthRoutes, { prisma });
 
   async function requireDashboardAuth(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -54,7 +69,8 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   // Only the first user to authenticate owns this instance.
   app.addHook("preHandler", async (request) => {
     if (!request.url.startsWith("/api/auth")) return;
-    if (!request.url.includes("/callback/google") && !request.url.includes("/callback/github")) return;
+    if (!request.url.includes("/callback/google") && !request.url.includes("/callback/github"))
+      return;
 
     oauthCallbackUserCounts.set(request, await prisma.user.count());
   });
@@ -65,7 +81,11 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     const secret = process.env.BETTER_AUTH_SECRET ?? "locallink-dev-secret";
     const token = await signJWT({ email: email.toLowerCase() }, secret, 60 * 60 * 24);
     const callbackURL = encodeURIComponent(`${frontendBaseUrl}/login?verified=1`);
-    await sendVerificationEmail(email, `${baseUrl}/api/auth/verify-email?token=${token}&callbackURL=${callbackURL}`);
+    await sendVerificationEmail(
+      email,
+      `${baseUrl}/api/auth/verify-email?token=${token}&callbackURL=${callbackURL}`,
+      request.log,
+    );
   }
 
   app.get("/api/auth/google", async (_request, reply) => {
@@ -129,7 +149,11 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   app.all("/api/auth/*", async (request, reply) => {
     const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
     const url = new URL(request.raw.url ?? "/", baseUrl);
-    if (request.method === "POST" && url.pathname === "/api/auth/sign-up/email" && (await prisma.user.count()) >= 1) {
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/auth/sign-up/email" &&
+      (await prisma.user.count()) >= 1
+    ) {
       return reply.code(403).send({ error: "single_user_instance" });
     }
     if (request.method === "POST" && url.pathname === "/api/auth/forget-password") {
@@ -147,8 +171,8 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       new Request(url, {
         method: request.method,
         headers: fromNodeHeaders(request.headers),
-        body
-      })
+        body,
+      }),
     );
 
     const beforeCallbackUserCount = oauthCallbackUserCounts.get(request);
@@ -156,12 +180,14 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     if (beforeCallbackUserCount !== undefined) {
       const users: Array<{ email: string; id: string }> = await prisma.user.findMany({
         orderBy: { createdAt: "asc" },
-        select: { email: true, id: true }
+        select: { email: true, id: true },
       });
       if (beforeCallbackUserCount >= 1 && users.length > beforeCallbackUserCount) {
         const extraUserIds = users.slice(1).map((user) => user.id);
         await prisma.user.deleteMany({ where: { id: { in: extraUserIds } } });
-        return reply.redirect(`${process.env.FRONTEND_BASE_URL ?? "http://localhost:3000"}/?error=single_user_instance`);
+        return reply.redirect(
+          `${process.env.FRONTEND_BASE_URL ?? "http://localhost:3000"}/?error=single_user_instance`,
+        );
       }
 
       const user = users[0];
@@ -181,14 +207,17 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       reply.header("set-cookie", cookieHeader);
     }
     if (oauthSessionUser) {
-      const token = app.jwt.sign({ sub: oauthSessionUser.id, email: oauthSessionUser.email }, { expiresIn: "7d" });
+      const token = app.jwt.sign(
+        { sub: oauthSessionUser.id, email: oauthSessionUser.email },
+        { expiresIn: "7d" },
+      );
       reply.setCookie(sessionCookieName, token, {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
         domain: cookieDomain,
-        maxAge: 60 * 60 * 24 * 7
+        maxAge: 60 * 60 * 24 * 7,
       });
     }
 
@@ -211,10 +240,10 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
             create: {
               accountId: email,
               providerId: "credential",
-              password: passwordHash
-            }
-          }
-        }
+              password: passwordHash,
+            },
+          },
+        },
       });
       await sendDashboardVerificationEmail(user.email, request);
     }
@@ -222,7 +251,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     const credentialAccount = user
       ? await prisma.account.findFirst({
           where: { userId: user.id, providerId: "credential", password: { not: null } },
-          select: { password: true }
+          select: { password: true },
         })
       : null;
     const storedPassword = credentialAccount?.password ?? user?.passwordHash;
@@ -241,7 +270,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       secure: process.env.NODE_ENV === "production",
       path: "/",
       domain: cookieDomain,
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: 60 * 60 * 24 * 7,
     });
     return { user: { id: user.id, email: user.email } };
   });
@@ -258,36 +287,40 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true }
+      select: { id: true, email: true, name: true },
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
 
     return { user: { ...user, sub: user.id } };
   });
 
-  app.patch<{ Body: UpdateCurrentUserBody }>("/auth/me", { preHandler: requireDashboardAuth }, async (request, reply) => {
-    const authUser = request.user as { sub?: string; id?: string };
-    const userId = authUser.sub ?? authUser.id;
-    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+  app.patch<{ Body: UpdateCurrentUserBody }>(
+    "/auth/me",
+    { preHandler: requireDashboardAuth },
+    async (request, reply) => {
+      const authUser = request.user as { sub?: string; id?: string };
+      const userId = authUser.sub ?? authUser.id;
+      if (!userId) return reply.code(401).send({ error: "Unauthorized" });
 
-    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-    if (!name) return reply.code(400).send({ error: "Display name is required" });
+      const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+      if (!name) return reply.code(400).send({ error: "Display name is required" });
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { name },
-      select: { id: true, email: true, name: true }
-    });
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { name },
+        select: { id: true, email: true, name: true },
+      });
 
-    return { user: { ...user, sub: user.id } };
-  });
+      return { user: { ...user, sub: user.id } };
+    },
+  );
 
   app.get("/hosts/me", async (request, reply) => {
     const token = extractBearerToken(request);
     if (!token) return reply.code(401).send({ error: "Unauthorized" });
 
     const resource = await prisma.resource.findFirst({
-      where: { tokenHash: hashApiKey(token), active: true }
+      where: { tokenHash: hashApiKey(token), active: true },
     });
     if (!resource) return reply.code(401).send({ error: "Unauthorized" });
 
@@ -296,7 +329,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       name: resource.name,
       type: fromPrismaResourceType(resource.type),
       config: resource.config,
-      gatewayUrl: process.env.BACKEND_BASE_URL
+      gatewayUrl: process.env.BACKEND_BASE_URL,
     };
   });
 
@@ -307,15 +340,17 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       prisma.requestLog.groupBy({
         by: ["resourceId"],
         where: { createdAt: { gte: since } },
-        _count: { resourceId: true }
-      })
+        _count: { resourceId: true },
+      }),
     ]);
-    const reqs24hByResource = new Map(requestCounts.map(count => [count.resourceId, count._count.resourceId]));
-    const connectedIds = new Set(tunnel.connectedHosts().map(h => h.id));
-    return resources.map(r => ({
+    const reqs24hByResource = new Map(
+      requestCounts.map((count) => [count.resourceId, count._count.resourceId]),
+    );
+    const connectedIds = new Set(tunnel.connectedHosts().map((h) => h.id));
+    return resources.map((r) => ({
       ...serializeResource(r),
       connected: connectedIds.has(r.id),
-      reqs24h: reqs24hByResource.get(r.id) ?? 0
+      reqs24h: reqs24hByResource.get(r.id) ?? 0,
     }));
   });
 
@@ -330,14 +365,16 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
         config: parsed.data.config,
         hostId: parsed.data.hostId,
         tokenHash: generated.tokenHash,
-        tokenPrefix: generated.prefix
-      }
+        tokenPrefix: generated.prefix,
+      },
     });
     const resource = await prisma.resource.update({
       where: { id: created.id },
-      data: { hostId: created.id }
+      data: { hostId: created.id },
     });
-    return reply.code(201).send({ resource: serializeResource(resource), hostToken: generated.token });
+    return reply
+      .code(201)
+      .send({ resource: serializeResource(resource), hostToken: generated.token });
   });
 
   app.get<{ Params: ResourceParams }>(
@@ -347,7 +384,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       const resource = await prisma.resource.findUnique({ where: { id: request.params.id } });
       if (!resource) return reply.code(404).send({ error: "Resource not found" });
       return serializeResource(resource);
-    }
+    },
   );
 
   app.patch<{ Params: ResourceParams }>(
@@ -358,10 +395,10 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
       const resource = await prisma.resource.update({
         where: { id: request.params.id },
-        data: parsed.data
+        data: parsed.data,
       });
       return serializeResource(resource);
-    }
+    },
   );
 
   app.delete<{ Params: ResourceParams }>(
@@ -370,7 +407,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     async (request) => {
       await prisma.resource.delete({ where: { id: request.params.id } });
       return { ok: true };
-    }
+    },
   );
 
   app.post<{ Params: ResourceParams }>(
@@ -382,11 +419,13 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
         where: { id: request.params.id },
         data: {
           tokenHash: generated.tokenHash,
-          tokenPrefix: generated.prefix
-        }
+          tokenPrefix: generated.prefix,
+        },
       });
-      return reply.code(201).send({ resource: serializeResource(resource), hostToken: generated.token });
-    }
+      return reply
+        .code(201)
+        .send({ resource: serializeResource(resource), hostToken: generated.token });
+    },
   );
 
   app.post<{ Params: ResourceParams }>(
@@ -395,7 +434,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     async (request, reply) => {
       const parsed = apiKeyCreationSchema.safeParse({
         ...(typeof request.body === "object" && request.body ? request.body : {}),
-        resourceId: request.params.id
+        resourceId: request.params.id,
       });
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
       const generated = createApiKey();
@@ -404,11 +443,11 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
           name: parsed.data.name,
           resourceId: request.params.id,
           keyHash: generated.keyHash,
-          prefix: generated.prefix
-        }
+          prefix: generated.prefix,
+        },
       });
       return reply.code(201).send({ apiKey, key: generated.key });
-    }
+    },
   );
 
   app.get<{ Params: ResourceParams }>(
@@ -417,24 +456,28 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     async (request) => {
       return prisma.apiKey.findMany({
         where: { resourceId: request.params.id },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
       });
-    }
+    },
   );
 
-  app.delete<{ Params: KeyParams }>("/keys/:id", { preHandler: requireDashboardAuth }, async (request) => {
-    await prisma.apiKey.delete({ where: { id: request.params.id } });
-    return { ok: true };
-  });
+  app.delete<{ Params: KeyParams }>(
+    "/keys/:id",
+    { preHandler: requireDashboardAuth },
+    async (request) => {
+      await prisma.apiKey.delete({ where: { id: request.params.id } });
+      return { ok: true };
+    },
+  );
 
   app.get("/logs/recent", { preHandler: requireDashboardAuth }, async () => {
     const items = await prisma.requestLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
-      include: { resource: { select: { name: true } } }
+      include: { resource: { select: { name: true } } },
     });
 
-    return items.map(item => ({
+    return items.map((item) => ({
       id: item.id,
       time: item.createdAt.toISOString(),
       res: item.resource.name,
@@ -442,76 +485,89 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       path: item.path,
       status: item.statusCode,
       dur: `${item.durationMs}ms`,
-      key: item.apiKeyId ? item.apiKeyId.slice(0, 8) : "–"
+      key: item.apiKeyId ? item.apiKeyId.slice(0, 8) : "–",
     }));
   });
 
-  app.get<{ Querystring: LogsQuery }>("/logs", { preHandler: requireDashboardAuth }, async (request) => {
-    const page = Math.max(Number(request.query.page ?? "1"), 1);
-    const limit = Math.min(Math.max(Number(request.query.limit ?? "50"), 1), 100);
-    const where = request.query.resourceId ? { resourceId: request.query.resourceId } : {};
-    const [items, total] = await Promise.all([
-      prisma.requestLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      prisma.requestLog.count({ where })
-    ]);
-    return { items, page, limit, total };
-  });
-
-  app.get("/health", async () => {
-    return { status: "ok", uptime: process.uptime() };
-  });
+  app.get<{ Querystring: LogsQuery }>(
+    "/logs",
+    { preHandler: requireDashboardAuth },
+    async (request) => {
+      const page = Math.max(Number(request.query.page ?? "1"), 1);
+      const limit = Math.min(Math.max(Number(request.query.limit ?? "50"), 1), 100);
+      const where = request.query.resourceId ? { resourceId: request.query.resourceId } : {};
+      const [items, total] = await Promise.all([
+        prisma.requestLog.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.requestLog.count({ where }),
+      ]);
+      return { items, page, limit, total };
+    },
+  );
 
   app.get("/tunnel/status", { preHandler: requireDashboardAuth }, async () => {
     return { hosts: tunnel.connectedHosts() };
   });
 
-  app.all<{ Params: { resourceId: string; "*": string } }>("/r/:resourceId/*", async (request, reply) => {
-    const started = Date.now();
-    const apiKeyValue = extractApiKey(request);
-    if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
+  app.all<{ Params: { resourceId: string; "*": string } }>(
+    "/r/:resourceId/*",
+    async (request, reply) => {
+      const started = Date.now();
+      const apiKeyValue = extractApiKey(request);
+      if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
 
-    const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(apiKeyValue) } });
-    if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
-      return reply.code(403).send({ error: "Invalid API key" });
-    }
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { keyHash: hashApiKey(apiKeyValue) },
+      });
+      if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
+        return reply.code(403).send({ error: "Invalid API key" });
+      }
 
-    const resource = await prisma.resource.findUnique({ where: { id: request.params.resourceId } });
-    if (!resource || !resource.active) return reply.code(404).send({ error: "Resource not found" });
+      const resource = await prisma.resource.findUnique({
+        where: { id: request.params.resourceId },
+      });
+      if (!resource || !resource.active)
+        return reply.code(404).send({ error: "Resource not found" });
 
-    const targetPath = `/${request.params["*"] ?? ""}${request.url.includes("?") ? `?${request.url.split("?")[1]}` : ""}`;
-    const response = await tunnel.send(resource.hostId, {
-      requestId: randomUUID(),
-      resourceId: resource.id,
-      method: request.method,
-      path: targetPath,
-      headers: normalizeHeaders(request.headers),
-      body: typeof request.body === "string" ? request.body : request.body ? JSON.stringify(request.body) : null
-    });
+      const targetPath = `/${request.params["*"] ?? ""}${request.url.includes("?") ? `?${request.url.split("?")[1]}` : ""}`;
+      const response = await tunnel.send(resource.hostId, {
+        requestId: randomUUID(),
+        resourceId: resource.id,
+        method: request.method,
+        path: targetPath,
+        headers: normalizeHeaders(request.headers),
+        body:
+          typeof request.body === "string"
+            ? request.body
+            : request.body
+              ? JSON.stringify(request.body)
+              : null,
+      });
 
-    await Promise.all([
-      prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } }),
-      prisma.requestLog.create({
-        data: {
-          resourceId: resource.id,
-          apiKeyId: apiKey.id,
-          method: request.method,
-          path: targetPath,
-          statusCode: response.statusCode,
-          durationMs: Date.now() - started
-        }
-      })
-    ]);
+      await Promise.all([
+        prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } }),
+        prisma.requestLog.create({
+          data: {
+            resourceId: resource.id,
+            apiKeyId: apiKey.id,
+            method: request.method,
+            path: targetPath,
+            statusCode: response.statusCode,
+            durationMs: Date.now() - started,
+          },
+        }),
+      ]);
 
-    for (const [key, value] of Object.entries(response.headers)) {
-      reply.header(key, value);
-    }
-    return reply.code(response.statusCode).send(response.body);
-  });
+      for (const [key, value] of Object.entries(response.headers)) {
+        reply.header(key, value);
+      }
+      return reply.code(response.statusCode).send(response.body);
+    },
+  );
 
   return app;
 }
@@ -534,7 +590,7 @@ function normalizeHeaders(headers: FastifyRequest["headers"]) {
     Object.entries(headers).flatMap(([key, value]) => {
       if (!value) return [];
       return [[key, Array.isArray(value) ? value.join(",") : String(value)]];
-    })
+    }),
   );
 }
 
@@ -550,7 +606,9 @@ function fromPrismaResourceType(type: "database" | "ai_model" | "http_api") {
   return "database";
 }
 
-function serializeResource<T extends { tokenHash?: string | null; type: "database" | "ai_model" | "http_api" }>(resource: T) {
+function serializeResource<
+  T extends { tokenHash?: string | null; type: "database" | "ai_model" | "http_api" },
+>(resource: T) {
   const sanitized = { ...resource };
   delete sanitized.tokenHash;
   return { ...sanitized, type: fromPrismaResourceType(resource.type) };

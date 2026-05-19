@@ -20,9 +20,14 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages ./packages
-COPY --from=build /app/services/gateway ./services/gateway
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 gateway
+COPY --from=build --chown=gateway:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=gateway:nodejs /app/packages ./packages
+COPY --from=build --chown=gateway:nodejs /app/services/gateway ./services/gateway
 WORKDIR /app/services/gateway
+USER gateway
 EXPOSE 3003
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3003/health || exit 1
 CMD ["node", "dist/server.js"]
