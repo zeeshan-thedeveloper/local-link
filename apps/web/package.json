@@ -14,8 +14,8 @@
   "dependencies": {
     "@locallink/shared": "workspace:*",
     "autoprefixer": "^10.4.20",
-    "next": "^15.1.4",
-    "postcss": "^8.5.1",
+    "next": "^15.5.18",
+    "postcss": "^8.5.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^3.4.17"
