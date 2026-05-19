@@ -4,17 +4,24 @@ import { createApp } from "./app.js";
 
 function createPrismaMock() {
   const state = {
-    users: [] as Array<{ id: string; email: string; emailVerified?: boolean; name?: string; passwordHash: string }>,
+    users: [] as Array<{
+      id: string;
+      email: string;
+      emailVerified?: boolean;
+      name?: string;
+      passwordHash: string;
+    }>,
     resources: [] as Array<Record<string, unknown>>,
     apiKeys: [] as Array<Record<string, unknown>>,
-    logs: [] as Array<Record<string, unknown>>
+    logs: [] as Array<Record<string, unknown>>,
   };
 
   return {
     state,
     user: {
-      findUnique: vi.fn(({ where }) =>
-        state.users.find((user) => user.email === where.email || user.id === where.id) ?? null
+      findUnique: vi.fn(
+        ({ where }) =>
+          state.users.find((user) => user.email === where.email || user.id === where.id) ?? null,
       ),
       count: vi.fn(() => state.users.length),
       create: vi.fn(({ data }) => {
@@ -26,18 +33,20 @@ function createPrismaMock() {
         const index = state.users.findIndex((user) => user.id === where.id);
         state.users[index] = { ...state.users[index], ...data };
         return state.users[index];
-      })
+      }),
     },
     account: {
       findFirst: vi.fn(({ where }) => {
         const user = state.users.find((item) => item.id === where.userId);
         if (!user?.passwordHash) return null;
         return { password: user.passwordHash };
-      })
+      }),
     },
     resource: {
       findMany: vi.fn(() => state.resources),
-      findUnique: vi.fn(({ where }) => state.resources.find((resource) => resource.id === where.id) ?? null),
+      findUnique: vi.fn(
+        ({ where }) => state.resources.find((resource) => resource.id === where.id) ?? null,
+      ),
       create: vi.fn(({ data }) => {
         const resource = { id: "res_1", active: true, createdAt: new Date(), ...data };
         state.resources.push(resource);
@@ -51,7 +60,7 @@ function createPrismaMock() {
       delete: vi.fn(({ where }) => {
         state.resources = state.resources.filter((resource) => resource.id !== where.id);
         return { id: where.id };
-      })
+      }),
     },
     apiKey: {
       create: vi.fn(({ data }) => {
@@ -59,10 +68,14 @@ function createPrismaMock() {
         state.apiKeys.push(apiKey);
         return apiKey;
       }),
-      findMany: vi.fn(({ where }) => state.apiKeys.filter((key) => key.resourceId === where.resourceId)),
-      findUnique: vi.fn(({ where }) => state.apiKeys.find((key) => key.keyHash === where.keyHash) ?? null),
+      findMany: vi.fn(({ where }) =>
+        state.apiKeys.filter((key) => key.resourceId === where.resourceId),
+      ),
+      findUnique: vi.fn(
+        ({ where }) => state.apiKeys.find((key) => key.keyHash === where.keyHash) ?? null,
+      ),
       update: vi.fn(() => ({})),
-      delete: vi.fn(({ where }) => ({ id: where.id }))
+      delete: vi.fn(({ where }) => ({ id: where.id })),
     },
     requestLog: {
       findMany: vi.fn(() => state.logs),
@@ -70,8 +83,9 @@ function createPrismaMock() {
       create: vi.fn(({ data }) => {
         state.logs.push(data);
         return data;
-      })
-    }
+      }),
+    },
+    $queryRaw: vi.fn(() => [{ result: 1 }]),
   } as unknown as PrismaClient & { state: typeof state };
 }
 
@@ -84,18 +98,18 @@ describe("gateway app", () => {
     const app = await createApp({
       prisma,
       jwtSecret: "test-secret",
-      tunnel: { connectedHosts: () => [], send: vi.fn() }
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
     await app.inject({
       method: "POST",
       url: "/auth/login",
-      payload: { email: "me@example.com", password: "password" }
+      payload: { email: "me@example.com", password: "password" },
     });
     if (prisma.state.users[0]) prisma.state.users[0].emailVerified = true;
     const response = await app.inject({
       method: "POST",
       url: "/auth/login",
-      payload: { email: "me@example.com", password: "password" }
+      payload: { email: "me@example.com", password: "password" },
     });
     cookie = response.headers["set-cookie"] as string;
     await app.close();
@@ -110,29 +124,29 @@ describe("gateway app", () => {
     const app = await createApp({
       prisma,
       jwtSecret: "test-secret",
-      tunnel: { connectedHosts: () => [], send: vi.fn() }
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
 
     const patch = await app.inject({
       method: "PATCH",
       url: "/auth/me",
       headers: { cookie },
-      payload: { name: "Zeeshan" }
+      payload: { name: "Zeeshan" },
     });
 
     expect(patch.statusCode).toBe(200);
     expect(patch.json()).toMatchObject({
-      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" }
+      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" },
     });
 
     const me = await app.inject({
       method: "GET",
       url: "/auth/me",
-      headers: { cookie }
+      headers: { cookie },
     });
 
     expect(me.json()).toMatchObject({
-      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" }
+      user: { id: "user_1", sub: "user_1", email: "me@example.com", name: "Zeeshan" },
     });
 
     await app.close();
@@ -142,10 +156,28 @@ describe("gateway app", () => {
     const app = await createApp({
       prisma,
       jwtSecret: "test-secret",
-      tunnel: { connectedHosts: () => [], send: vi.fn() }
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
     const response = await app.inject({ method: "GET", url: "/resources" });
     expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("serves health and readiness without auth", async () => {
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
+    });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toMatchObject({ status: "ok" });
+    expect(ready.statusCode).toBe(200);
+    expect(ready.json()).toMatchObject({ status: "ready", database: "connected" });
+
     await app.close();
   });
 
@@ -153,7 +185,7 @@ describe("gateway app", () => {
     const app = await createApp({
       prisma,
       jwtSecret: "test-secret",
-      tunnel: { connectedHosts: () => [], send: vi.fn() }
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
     const create = await app.inject({
       method: "POST",
@@ -163,15 +195,15 @@ describe("gateway app", () => {
         name: "Local API",
         type: "http-api",
         hostId: "laptop",
-        config: { url: "http://localhost:8080" }
-      }
+        config: { url: "http://localhost:8080" },
+      },
     });
     expect(create.statusCode).toBe(201);
     const patch = await app.inject({
       method: "PATCH",
       url: "/resources/res_1",
       headers: { cookie },
-      payload: { active: false }
+      payload: { active: false },
     });
     expect(patch.json()).toMatchObject({ active: false });
     await app.close();

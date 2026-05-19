@@ -12,3 +12,9 @@ coverage
 .env
 .env.local
 .env.*.local
+.git
+**/*.test.ts
+**/*.spec.ts
+**/__tests__/
+**/test/
+examples/
