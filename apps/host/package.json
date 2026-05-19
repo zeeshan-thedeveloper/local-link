@@ -24,10 +24,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.4.2",
+    "@inquirer/prompts": "^8.4.3",
     "@locallink/shared": "workspace:*",
     "commander": "^12.1.0",
-    "pg": "^8.13.1",
+    "pg": "^8.21.0",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
