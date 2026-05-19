@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import type { FastifyBaseLogger } from "fastify";
 
 const from = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
 
@@ -10,10 +11,10 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-async function sendEmail(to: string, subject: string, body: string) {
+async function sendEmail(to: string, subject: string, body: string, logger?: FastifyBaseLogger) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(`[email] RESEND_API_KEY is not set; skipped "${subject}" email to ${to}: ${body}`);
+    logger?.warn({ to, subject }, "RESEND_API_KEY is not set; skipped email");
     return;
   }
 
@@ -26,14 +27,14 @@ async function sendEmail(to: string, subject: string, body: string) {
     html: `
       <p>${escapedBody}</p>
       <p><a href="${escapedBody}">${escapedBody}</a></p>
-    `
+    `,
   });
 }
 
-export async function sendVerificationEmail(to: string, url: string) {
-  await sendEmail(to, "Verify your LocalLink email", url);
+export async function sendVerificationEmail(to: string, url: string, logger?: FastifyBaseLogger) {
+  await sendEmail(to, "Verify your LocalLink email", url, logger);
 }
 
-export async function sendPasswordResetEmail(to: string, url: string) {
-  await sendEmail(to, "Reset your LocalLink password", url);
+export async function sendPasswordResetEmail(to: string, url: string, logger?: FastifyBaseLogger) {
+  await sendEmail(to, "Reset your LocalLink password", url, logger);
 }
