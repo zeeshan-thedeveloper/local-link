@@ -17,12 +17,13 @@ type CreatedResource = {
   hostToken: string;
 };
 
-const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
+const gatewayUrl =
+  process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 export function AddResourceSlideOver({
   open,
   onClose,
-  onCreated
+  onCreated,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,9 +37,8 @@ export function AddResourceSlideOver({
   const [isPending, startTransition] = useTransition();
 
   const types: Array<{ id: ResourceType; name: string; desc: string }> = [
-    { id: "database", name: "Database", desc: "Postgres, MySQL, Redis, MongoDB" },
-    { id: "ai-model", name: "AI Model", desc: "Ollama, ComfyUI, llama.cpp" },
-    { id: "http-api", name: "HTTP API", desc: "Any local web service" }
+    { id: "database", name: "Database", desc: "Postgres query endpoint" },
+    { id: "http-api", name: "HTTP API", desc: "Any local web service" },
   ];
 
   const submit = () => {
@@ -50,16 +50,16 @@ export function AddResourceSlideOver({
             ? {
                 engine: "postgres",
                 connectionString:
-                  connectionString || localUrl || "postgresql://locallink:locallink@localhost:5433/locallink"
+                  connectionString ||
+                  localUrl ||
+                  "postgresql://locallink:locallink@localhost:5433/locallink",
               }
-            : type === "ai-model"
-              ? { provider: "openai-compatible", baseUrl: localUrl || "http://localhost:11434", model: name || "local" }
-              : { url: localUrl || "http://localhost:3000" };
+            : { url: localUrl || "http://localhost:3000" };
         const response = await fetch(`${gatewayUrl}/resources`, {
           method: "POST",
           credentials: "include",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name, type, hostId: "pending", config })
+          body: JSON.stringify({ name, type, hostId: "pending", config }),
         });
         if (!response.ok) {
           throw new Error(`Gateway request failed: ${response.status}`);
@@ -83,7 +83,9 @@ export function AddResourceSlideOver({
         <div className="slideover-head">
           <div>
             <div className="slideover-title">Add resource</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-2)", marginTop: 2 }}>Tunnel a local service through the gateway</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-2)", marginTop: 2 }}>
+              Tunnel a local service through the gateway
+            </div>
           </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose} type="button">
             <Icon name="close" size={14} />
@@ -111,21 +113,36 @@ export function AddResourceSlideOver({
           </div>
           <div className="field">
             <div className="field-label">Name</div>
-            <input className="input" placeholder="Resource name" value={name} onChange={(event) => setName(event.target.value)} />
+            <input
+              className="input"
+              placeholder="Resource name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
           </div>
           <div className="field">
-            <div className="field-label">Local URL <span className="opt">on host machine</span></div>
+            <div className="field-label">
+              Local URL <span className="opt">on host machine</span>
+            </div>
             <input
               className="input mono"
-              placeholder={type === "database" ? "postgresql://localhost:5433/locallink" : type === "ai-model" ? "http://localhost:11434" : "http://localhost:3000"}
+              placeholder={
+                type === "database"
+                  ? "postgresql://localhost:5433/locallink"
+                  : "http://localhost:3000"
+              }
               value={localUrl}
               onChange={(event) => setLocalUrl(event.target.value)}
             />
-            <div className="field-help">You can update this later with the host CLI setup wizard.</div>
+            <div className="field-help">
+              You can update this later with the host CLI setup wizard.
+            </div>
           </div>
           {type === "database" && (
             <div className="field">
-              <div className="field-label">Connection string <span className="opt">optional</span></div>
+              <div className="field-label">
+                Connection string <span className="opt">optional</span>
+              </div>
               <textarea
                 className="textarea"
                 rows={3}
@@ -143,8 +160,15 @@ export function AddResourceSlideOver({
           )}
         </div>
         <div className="slideover-foot">
-          <button className="btn btn-ghost" onClick={onClose} type="button">Cancel</button>
-          <button className="btn btn-primary" onClick={submit} disabled={!name.trim() || isPending} type="button">
+          <button className="btn btn-ghost" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={submit}
+            disabled={!name.trim() || isPending}
+            type="button"
+          >
             <Icon name="plus" size={13} />
             {isPending ? "Creating..." : "Create resource"}
           </button>
