@@ -52,14 +52,25 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     environment: staging
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
+      - name: Skip staging deploy when SSH secrets are missing
+        if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
+        run: |
+          echo "Skipping staging deploy because one or more required secrets are missing."
+          echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
+
       - name: Deploy staging container via SSH
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
         uses: appleboy/ssh-action@v1
         with:
           # Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY.
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_KEY }}
           script: |
             docker pull ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
 
@@ -94,14 +105,25 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
+      - name: Skip production deploy when SSH secrets are missing
+        if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
+        run: |
+          echo "Skipping production deploy because one or more required secrets are missing."
+          echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
+
       - name: Deploy production container via SSH
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
         uses: appleboy/ssh-action@v1
         with:
           # Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY.
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_KEY }}
           script: |
             PREV_IMAGE=$(docker inspect --format='{{.Image}}' locallink-gateway 2>/dev/null || echo "")
 
