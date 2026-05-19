@@ -1,0 +1,4 @@
+# Go standard library CVEs reported through bundled build/tooling binaries in the gateway image.
+# Revisit after upstream Prisma/esbuild packages publish patched binaries.
+CVE-2026-39836
+CVE-2026-42499
