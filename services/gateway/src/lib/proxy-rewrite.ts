@@ -46,6 +46,7 @@ function rewriteLocationHeaders(headers: Record<string, string>, resourceId: str
   for (const key of Object.keys(next)) {
     if (key.toLowerCase() !== "location") continue;
     const value = next[key];
+    if (!value) continue;
     if (value.startsWith("/") && !value.startsWith("//")) {
       next[key] = `${prefix}${value}`;
     }
