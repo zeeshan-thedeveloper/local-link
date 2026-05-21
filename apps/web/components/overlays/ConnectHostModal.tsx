@@ -11,7 +11,13 @@ type ConnectHostModalProps = {
   token: string;
 };
 
-export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }: ConnectHostModalProps) {
+export function ConnectHostModal({
+  open,
+  onClose,
+  resource,
+  gatewayUrl,
+  token,
+}: ConnectHostModalProps) {
   if (!resource) return null;
 
   const install = "npm install -g @locallink/cli";
@@ -22,18 +28,19 @@ export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }:
   return (
     <>
       <div className={"scrim " + (open ? "open" : "")} />
-      <div className={"modal " + (open ? "open" : "")} style={{ width: 620 }}>
+      <div className={"modal modal-connect-host " + (open ? "open" : "")}>
         <div className="modal-head">
           <h3 className="modal-title">Connect your host</h3>
           <p className="modal-sub">
             Run these on the machine where {resource.name} is running. The token is shown only once.
           </p>
         </div>
-        <div className="modal-body" style={{ display: "grid", gap: 12 }}>
+        <div className="modal-body">
           <CommandBlock label="Step 1 - Install the CLI" value={install} />
           <CommandBlock label="Step 2 - Setup wizard" value={setup} />
           <p className="field-help" style={{ margin: 0 }}>
-            The wizard verifies this resource, uses your gateway config, and can start the tunnel immediately.
+            The wizard verifies this resource, uses your gateway config, and can start the tunnel
+            immediately.
           </p>
           <CommandBlock label="Step 3 - Start later" value={start} />
           <div className="callout">
@@ -57,10 +64,10 @@ export function ConnectHostModal({ open, onClose, resource, gatewayUrl, token }:
 
 function CommandBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="command-block">
       <div className="field-label">{label}</div>
-      <pre className="code-block" style={{ margin: 0, paddingRight: 48 }}>
-        {value}
+      <pre className="code-block">
+        <code>{value}</code>
         <button className="copy" type="button" onClick={() => copyText(value)} title="Copy">
           <Icon name="copy" size={13} />
         </button>

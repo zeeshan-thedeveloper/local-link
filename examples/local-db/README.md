@@ -1,6 +1,6 @@
-# LocalLink Sample Backend
+# LocalLink Local DB Example
 
-This demo shows how a standalone Express API can consume a local Postgres database through LocalLink using the published `@locallink/client` package. It is intentionally isolated from the monorepo workspace so it behaves like any external application a developer might build.
+This demo shows how an Express API can consume a local Postgres database through LocalLink using the published `@locallink/client` package.
 
 ## Prerequisites
 
@@ -11,10 +11,16 @@ This demo shows how a standalone Express API can consume a local Postgres databa
 
 ## Setup
 
-Install dependencies with npm:
+Install dependencies from the monorepo root:
 
 ```sh
-npm install
+pnpm install
+```
+
+Or from this directory:
+
+```sh
+pnpm install --filter @locallink-examples/local-db
 ```
 
 Copy the example environment file and fill in the credentials from the LocalLink dashboard:
@@ -32,7 +38,7 @@ locallink start
 Run the API server:
 
 ```sh
-npm run dev
+pnpm dev
 ```
 
 The server starts on `http://localhost:3000` unless you set a different `PORT`.
@@ -136,7 +142,7 @@ The app imports `fromEnv()` from `@locallink/client/pg` and uses the returned po
 
 ```ts
 const pool = fromEnv();
-const { rows } = await pool.query('SELECT now()::text, version()');
+const { rows } = await pool.query("SELECT now()::text, version()");
 ```
 
 `fromEnv()` reads the LocalLink environment variables and builds a Postgres-compatible pool that routes queries through the LocalLink gateway and resource you configured. That makes it useful for feature-flagging database access across environments: production can use a direct real `pg` connection, while development or staging can use a LocalLink tunnel without changing the query code.

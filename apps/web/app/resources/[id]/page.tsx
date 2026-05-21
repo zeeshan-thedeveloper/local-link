@@ -719,10 +719,20 @@ function ConfigSection({
                 <dt>Type</dt>
                 <dd>{resource.type}</dd>
                 <dt>Gateway URL</dt>
-                <dd className="mono" style={{ fontSize: 12 }}>
+                <dd className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
                   {endpoint}
                 </dd>
               </dl>
+              {resource.type === "http-api" ? (
+                <p className="field-help" style={{ marginTop: 12 }}>
+                  Requests require an API key (<span className="mono">Authorization: Bearer …</span>{" "}
+                  or <span className="mono">x-api-key</span>). Opening the gateway URL in a browser
+                  without a key returns 401. Create a key under the API Keys tab, then test with{" "}
+                  <span className="mono">
+                    curl -H &quot;Authorization: Bearer &lt;key&gt;&quot; {endpoint}
+                  </span>
+                </p>
+              ) : null}
             </>
           ) : null}
         </div>
