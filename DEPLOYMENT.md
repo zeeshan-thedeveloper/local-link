@@ -23,22 +23,35 @@
 
 ## Normal Deployment
 
-Merging to `main` triggers `.github/workflows/deploy-gateway.yml`.
+Merging to `main` (when `services/gateway/**` or deploy files change) triggers `.github/workflows/deploy-gateway.yml`.
 
-The workflow builds `ghcr.io/<owner>/locallink-gateway:<sha>`, runs Prisma migrations, starts the gateway through Docker Compose, then checks `http://localhost:3003/health`.
+The workflow:
+
+1. Builds and pushes `ghcr.io/<owner>/locallink-gateway:<sha>` and `:latest`
+2. Copies `docker-compose.gateway.prod.yml` and `scripts/deploy-gateway-remote.sh` to `~/apps/locallink` on the droplet
+3. SSH runs the deploy script: `docker pull`, Prisma migrate, `docker compose up -d --force-recreate`
+4. Verifies `http://localhost:3003/health`
+
+The production compose file uses `image:` (not `build:`) and project name `locallink`, so the running container (`locallink-gateway-1`) is recreated on every deploy.
+
+You can also trigger a deploy manually: **Actions → Deploy Gateway → Run workflow**.
 
 Success means the GitHub Actions production job passes and `/health` returns `200`.
 
 ## Manual Deployment
 
-SSH to the server and run:
+SSH to the server and run (replace `<sha>` with the commit you want):
 
 ```sh
-cd ~/apps/locallink
-docker pull ghcr.io/<owner>/locallink-gateway:<sha>
-docker run --rm --env-file .env ghcr.io/<owner>/locallink-gateway:<sha> pnpm --filter @locallink/gateway prisma migrate deploy
-GATEWAY_IMAGE=ghcr.io/<owner>/locallink-gateway:<sha> docker compose up -d --no-deps gateway
-curl -sf http://localhost:3003/health
+export GATEWAY_IMAGE=ghcr.io/<owner>/locallink-gateway:<sha>
+~/apps/locallink/scripts/deploy-gateway-remote.sh
+```
+
+Or pull `latest`:
+
+```sh
+export GATEWAY_IMAGE=ghcr.io/<owner>/locallink-gateway:latest
+~/apps/locallink/scripts/deploy-gateway-remote.sh
 ```
 
 Success means the container is running and the health check returns JSON with `status: "ok"`.
