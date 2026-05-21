@@ -8,10 +8,10 @@
   - `~/apps/locallink/docker-compose.yml`
   - `~/apps/locallink/.env` for production
   - `~/apps/locallink/.env.staging` for staging
-- GitHub Actions secrets:
-  - `DEPLOY_HOST`
-  - `DEPLOY_USER`
-  - `DEPLOY_KEY`
+- GitHub Actions secrets (either naming works):
+  - Host: `DROPLET_IP` or `DEPLOY_HOST` (your droplet IP, e.g. `134.209.221.190`)
+  - SSH key: `SSH_PRIVATE_KEY` or `DEPLOY_KEY` (private key from `~/.ssh/id_ed25519` on your PC)
+  - User: `DEPLOY_USER` (optional; defaults to `zeesh`)
   - `DATABASE_URL`
   - `JWT_SECRET`
   - `GOOGLE_CLIENT_ID`
