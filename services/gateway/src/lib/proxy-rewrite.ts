@@ -7,7 +7,8 @@ export function rewriteRootPathsForGatewayPrefix(body: string, prefix: string): 
   if (!normalized.startsWith("/")) {
     throw new Error(`Gateway path prefix must start with /: ${prefix}`);
   }
-  return body.replace(/(^|["'`(=\s])\/(?!\/)/g, `$1${normalized}/`);
+  // Do not treat whitespace before "/" as a URL (avoids breaking HTML " />").
+  return body.replace(/(^|["'"(=])\/(?!\/)/g, `$1${normalized}/`);
 }
 
 export function shouldRewriteProxiedBody(contentType: string | undefined) {
