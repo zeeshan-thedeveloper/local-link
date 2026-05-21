@@ -20,8 +20,40 @@ export function useCurrentUser() {
   return useContext(CurrentUserContext);
 }
 
-export function notifyCurrentUserUpdated(user: CurrentUser) {
-  window.dispatchEvent(new CustomEvent<CurrentUser>(currentUserUpdatedEvent, { detail: user }));
+export function notifyCurrentUserUpdated(user: CurrentUser | null) {
+  window.dispatchEvent(
+    new CustomEvent<CurrentUser | null>(currentUserUpdatedEvent, { detail: user }),
+  );
+}
+
+async function fetchGatewayCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    const response = await fetch(`${gatewayUrl}/auth/me`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      user?: { email?: string; id?: string; sub?: string; name?: string | null };
+    };
+    const gatewayUser = data.user;
+    const userId = gatewayUser?.sub ?? gatewayUser?.id;
+    if (!gatewayUser?.email || !userId) return null;
+    return { id: userId, email: gatewayUser.email, name: gatewayUser.name ?? null };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWebCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    const response = await fetch("/api/auth/me", { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { user?: CurrentUser | null };
+    return data.user ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function crumbsForPath(pathname: string) {
@@ -67,7 +99,7 @@ export function AppShell({
 
   useEffect(() => {
     const onUserUpdated = (event: Event) => {
-      setUser((event as CustomEvent<CurrentUser>).detail);
+      setUser((event as CustomEvent<CurrentUser | null>).detail);
     };
 
     window.addEventListener(currentUserUpdatedEvent, onUserUpdated);
@@ -75,17 +107,18 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (user || pathname === "/" || pathname.startsWith("/login")) return;
+    if (pathname === "/" || pathname.startsWith("/login")) return;
 
     let cancelled = false;
     const hydrateUser = async () => {
-      try {
-        const response = await fetch("/api/auth/me", { cache: "no-store" });
-        if (!response.ok || cancelled) return;
-        const data = (await response.json()) as { user?: CurrentUser | null };
-        if (!cancelled && data.user) setUser(data.user);
-      } catch {
-        // keep server-provided user state
+      const gatewayUser = await fetchGatewayCurrentUser();
+      if (!cancelled && gatewayUser) {
+        setUser(gatewayUser);
+        return;
+      }
+      const webUser = await fetchWebCurrentUser();
+      if (!cancelled) {
+        setUser(webUser);
       }
     };
 
@@ -93,7 +126,7 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [pathname, user]);
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname === "/" || pathname.startsWith("/login")) return;

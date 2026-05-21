@@ -1,9 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { notifyCurrentUserUpdated } from "@/components/layout/AppShell";
 import { BuildBadge } from "@/components/layout/BuildBadge";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { Icon } from "@/components/ui/Icon";
 import type { CurrentUser } from "@/lib/gateway";
+
+const gatewayUrl =
+  process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 
 function initialsForUser(label: string, email: string) {
   const source = label || email.split("@")[0] || "";
@@ -22,8 +27,36 @@ export function Topbar({
   currentUser: CurrentUser | null;
 }) {
   const { theme, toggleTheme } = useTheme();
+  const [loggingOut, setLoggingOut] = useState(false);
   const userEmail = currentUser?.email ?? "Signed out";
   const userLabel = currentUser?.name?.trim() || userEmail;
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    notifyCurrentUserUpdated(null);
+    try {
+      // Clear gateway-domain session cookie (OAuth/session source of truth).
+      await fetch(`${gatewayUrl}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Continue best-effort cleanup below.
+    }
+    try {
+      // Clear web-domain session cookie used by server routes.
+      await fetch("/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+    } catch {
+      // Final redirect still ensures the user leaves protected pages.
+    } finally {
+      window.location.assign("/login");
+    }
+  };
 
   return (
     <div className="topbar">
@@ -64,11 +97,15 @@ export function Topbar({
         <div className="user-menu">
           <div className="avatar">{initialsForUser(userLabel, userEmail)}</div>
           <span title={userEmail}>{userLabel}</span>
-          <form action="/logout" method="post">
-            <button type="submit" className="btn btn-ghost btn-sm" aria-label="Log out">
-              <Icon name="logout" size={13} />
-            </button>
-          </form>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            aria-label="Log out"
+            onClick={() => void handleLogout()}
+            disabled={loggingOut}
+          >
+            <Icon name="logout" size={13} />
+          </button>
         </div>
       </div>
     </div>
