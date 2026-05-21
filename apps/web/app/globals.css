@@ -218,6 +218,20 @@ input, textarea, select { font-family: inherit; }
 .topbar-crumbs .current { color: var(--text-0); font-weight: 500; }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 
+.build-badge,
+.sidebar-build-badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.sidebar-build-badge {
+  display: block;
+  margin-top: 10px;
+  padding: 0 2px;
+}
+
 .avatar {
   width: 26px; height: 26px;
   border-radius: 50%;

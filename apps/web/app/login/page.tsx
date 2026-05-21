@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BuildBadge } from "@/components/layout/BuildBadge";
 import { LoginForm } from "./LoginForm";
 import "./login.css";
 
@@ -15,7 +16,7 @@ export default function LoginPage() {
       <Link className="login-topbar" href="/">
         <span className="brand-mark" />
         <span>LocalLink</span>
-        <span className="version">v0.4.2</span>
+        <BuildBadge className="version" titlePrefix="Web deploy" />
       </Link>
 
       <Link className="login-back" href="/">

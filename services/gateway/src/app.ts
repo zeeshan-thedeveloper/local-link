@@ -272,7 +272,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       domain: cookieDomain,
       maxAge: 60 * 60 * 24 * 7,
     });
-    return { user: { id: user.id, email: user.email } };
+    return { user: { id: user.id, email: user.email }, token };
   });
 
   app.post("/auth/logout", async (_request, reply) => {

@@ -36,7 +36,8 @@
   position: relative;
   z-index: 1;
 }
-.login-topbar .version {
+.login-topbar .version,
+.login-topbar .build-badge {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-3);
@@ -325,7 +326,8 @@
     linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
 }
 [data-theme="light"] .login-topbar { color: #111114; }
-[data-theme="light"] .login-topbar .version {
+[data-theme="light"] .login-topbar .version,
+.login-topbar .build-badge {
   background: #f0f0f4;
   border-color: rgba(0,0,0,0.08);
   color: #9b9ba8;
