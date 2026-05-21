@@ -59,37 +59,56 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     environment: staging
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip staging deploy when SSH secrets are missing
-        if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
+      - name: Resolve deploy SSH credentials
+        id: ssh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "Skipping staging deploy because one or more required secrets are missing."
-          echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
+          HOST="${DEPLOY_HOST:-$DROPLET_IP}"
+          USER="${DEPLOY_USER:-zeesh}"
+          if [ -n "$DEPLOY_KEY" ] || [ -n "$SSH_PRIVATE_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "user=$USER" >> "$GITHUB_OUTPUT"
+          if [ -n "$DEPLOY_KEY" ]; then
+            echo "use_deploy_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_deploy_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip staging deploy when SSH secrets are missing
+        if: steps.ssh.outputs.ready != 'true' || steps.ssh.outputs.host == ''
+        run: |
+          echo "Skipping staging deploy — set DROPLET_IP (or DEPLOY_HOST) and SSH_PRIVATE_KEY (or DEPLOY_KEY)."
 
       - name: Copy deploy files to droplet
-        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        if: steps.ssh.outputs.ready == 'true' && steps.ssh.outputs.host != ''
         uses: appleboy/scp-action@v1
         with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.DEPLOY_KEY }}
+          host: ${{ steps.ssh.outputs.host }}
+          username: ${{ steps.ssh.outputs.user }}
+          key: ${{ steps.ssh.outputs.use_deploy_key == 'true' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.gateway.prod.yml,scripts/deploy-gateway-remote.sh"
           target: "~/apps/locallink"
           strip_components: 0
 
       - name: Deploy staging container via SSH
-        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        if: steps.ssh.outputs.ready == 'true' && steps.ssh.outputs.host != ''
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.DEPLOY_KEY }}
+          host: ${{ steps.ssh.outputs.host }}
+          username: ${{ steps.ssh.outputs.user }}
+          key: ${{ steps.ssh.outputs.use_deploy_key == 'true' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
           script: |
             chmod +x ~/apps/locallink/scripts/deploy-gateway-remote.sh
             APP_DIR=~/apps/locallink \
@@ -106,37 +125,56 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment: production
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip production deploy when SSH secrets are missing
-        if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
+      - name: Resolve deploy SSH credentials
+        id: ssh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "Skipping production deploy because one or more required secrets are missing."
-          echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
+          HOST="${DEPLOY_HOST:-$DROPLET_IP}"
+          USER="${DEPLOY_USER:-zeesh}"
+          if [ -n "$DEPLOY_KEY" ] || [ -n "$SSH_PRIVATE_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "user=$USER" >> "$GITHUB_OUTPUT"
+          if [ -n "$DEPLOY_KEY" ]; then
+            echo "use_deploy_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_deploy_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip production deploy when SSH secrets are missing
+        if: steps.ssh.outputs.ready != 'true' || steps.ssh.outputs.host == ''
+        run: |
+          echo "Skipping production deploy — set DROPLET_IP (or DEPLOY_HOST) and SSH_PRIVATE_KEY (or DEPLOY_KEY)."
 
       - name: Copy deploy files to droplet
-        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        if: steps.ssh.outputs.ready == 'true' && steps.ssh.outputs.host != ''
         uses: appleboy/scp-action@v1
         with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.DEPLOY_KEY }}
+          host: ${{ steps.ssh.outputs.host }}
+          username: ${{ steps.ssh.outputs.user }}
+          key: ${{ steps.ssh.outputs.use_deploy_key == 'true' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.gateway.prod.yml,scripts/deploy-gateway-remote.sh"
           target: "~/apps/locallink"
           strip_components: 0
 
       - name: Deploy production gateway on droplet
-        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        if: steps.ssh.outputs.ready == 'true' && steps.ssh.outputs.host != ''
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.DEPLOY_KEY }}
+          host: ${{ steps.ssh.outputs.host }}
+          username: ${{ steps.ssh.outputs.user }}
+          key: ${{ steps.ssh.outputs.use_deploy_key == 'true' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
           script: |
             chmod +x ~/apps/locallink/scripts/deploy-gateway-remote.sh
             GATEWAY_IMAGE=ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }} \
