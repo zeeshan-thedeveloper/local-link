@@ -21,18 +21,53 @@ describe("proxyRequest", () => {
     if (!address || typeof address === "string") throw new Error("Expected TCP server address");
 
     const result = await proxyRequest(
-      { id: "res_1", type: "http-api", config: { type: "http-api", url: `http://127.0.0.1:${address.port}` } },
+      {
+        id: "res_1",
+        type: "http-api",
+        config: { type: "http-api", url: `http://127.0.0.1:${address.port}` },
+      },
       {
         requestId: "req_1",
         resourceId: "res_1",
         method: "GET",
         path: "/hello?x=1",
         headers: {},
-        body: null
-      }
+        body: null,
+      },
     );
 
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body ?? "{}")).toEqual({ method: "GET", url: "/hello?x=1" });
+  });
+
+  it("forwards the local upstream host instead of the public gateway host", async () => {
+    let seenHost: string | undefined;
+    const server = createServer((request, response) => {
+      seenHost = request.headers.host;
+      response.setHeader("content-type", "text/html");
+      response.end("<html><head></head><body>ok</body></html>");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    close = () => new Promise((resolve) => server.close(() => resolve()));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Expected TCP server address");
+
+    await proxyRequest(
+      {
+        id: "res_1",
+        type: "http-api",
+        config: { type: "http-api", url: `http://127.0.0.1:${address.port}` },
+      },
+      {
+        requestId: "req_2",
+        resourceId: "res_1",
+        method: "GET",
+        path: "/",
+        headers: { host: "locallink-api.zeeshanahmed.app", "accept-encoding": "gzip" },
+        body: null,
+      },
+    );
+
+    expect(seenHost).toBe(`127.0.0.1:${address.port}`);
   });
 });

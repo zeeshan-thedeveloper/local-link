@@ -6,6 +6,8 @@ export default defineConfig({
   server: {
     port: 25543,
     strictPort: true,
+    // Allow proxied requests that arrive with the public gateway Host header.
+    allowedHosts: true,
   },
   preview: {
     port: 25543,

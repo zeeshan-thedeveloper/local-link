@@ -46,6 +46,15 @@ describe("proxy-rewrite", () => {
     expect(body).toBe(input);
   });
 
+  it("injects a base href into HTML responses", () => {
+    const { body } = rewriteProxiedHttpResponse(
+      "<html><head></head><body></body></html>",
+      { "content-type": "text/html" },
+      "res_1",
+    );
+    expect(body).toContain('<base href="/r/res_1/">');
+  });
+
   it("detects rewritable content types", () => {
     expect(shouldRewriteProxiedBody("text/html; charset=utf-8")).toBe(true);
     expect(shouldRewriteProxiedBody("application/javascript")).toBe(true);
