@@ -1,5 +1,11 @@
 # locallink
 
+## 0.3.6
+
+### Patch Changes
+
+- ca79bf0: Fix local HTTP proxy to send the upstream Host header so Vite dev servers accept tunneled requests.
+
 ## 0.3.5
 
 ### Patch Changes
