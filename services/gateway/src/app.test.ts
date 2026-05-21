@@ -279,6 +279,33 @@ describe("gateway app", () => {
     await app.close();
   });
 
+  it("rewrites root-absolute asset paths in proxied HTML", async () => {
+    const send = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+      body: '<script type="module" src="/src/main.tsx"></script>',
+    });
+    prisma.state.resources.push({
+      id: "res_rewrite",
+      name: "Vite app",
+      type: "http_api",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:25543", publicAccess: true },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send },
+    });
+
+    const response = await app.inject({ method: "GET", url: "/r/res_rewrite" });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('src="/r/res_rewrite/src/main.tsx"');
+    await app.close();
+  });
+
   it("still requires an API key for private HTTP resources", async () => {
     prisma.state.resources.push({
       id: "res_private",
