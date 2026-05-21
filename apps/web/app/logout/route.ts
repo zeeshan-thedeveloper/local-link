@@ -9,10 +9,10 @@ export async function POST(request: Request) {
   if (session) {
     await fetch(`${gatewayUrl}/auth/logout`, {
       method: "POST",
-      headers: { cookie: `locallink_session=${session.value}` }
+      headers: { cookie: `locallink_session=${session.value}` },
     }).catch(() => {});
     cookieStore.delete("locallink_session");
   }
 
-  return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.redirect(new URL("/login", request.url));
 }
