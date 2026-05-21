@@ -1,0 +1,17 @@
+# Production gateway on the DigitalOcean droplet.
+# Used by .github/workflows/deploy-gateway.yml — do not use `build:` here.
+name: locallink
+
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE is required}
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${GATEWAY_PORT:-3003}:3003"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
