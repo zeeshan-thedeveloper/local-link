@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
+import { hashApiKey } from "./lib/keys.js";
 
 function createPrismaMock() {
   const state = {
@@ -206,6 +207,46 @@ describe("gateway app", () => {
       payload: { active: false },
     });
     expect(patch.json()).toMatchObject({ active: false });
+    await app.close();
+  });
+
+  it("proxies resource root path without a trailing subpath", async () => {
+    const send = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      headers: { "content-type": "text/html" },
+      body: "<html></html>",
+    });
+    const apiKey = "ll_test_root_proxy";
+    prisma.state.resources.push({
+      id: "res_http",
+      name: "HTTP Demo",
+      type: "http_api",
+      hostId: "host_1",
+      active: true,
+    });
+    prisma.state.apiKeys.push({
+      id: "key_1",
+      resourceId: "res_http",
+      keyHash: hashApiKey(apiKey),
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/r/res_http",
+      headers: { authorization: `Bearer ${apiKey}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(send).toHaveBeenCalledWith(
+      "host_1",
+      expect.objectContaining({ resourceId: "res_http", method: "GET", path: "/" }),
+    );
     await app.close();
   });
 });

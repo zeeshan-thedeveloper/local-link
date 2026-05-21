@@ -150,7 +150,16 @@ input, textarea, select { font-family: inherit; }
   background: none;
   text-align: left;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   transition: background 80ms, color 80ms;
+}
+.nav-item > span:not(.kbd) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .nav-item:hover { background: var(--bg-2); color: var(--text-1); }
 .nav-item.active { background: var(--bg-3); color: var(--text-0); }
@@ -158,13 +167,15 @@ input, textarea, select { font-family: inherit; }
 .nav-item.active .icon { opacity: 1; color: var(--accent); }
 .nav-item .kbd {
   margin-left: auto;
+  flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-4);
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 5px;
+  white-space: nowrap;
 }
 
 .sidebar-foot {
@@ -681,7 +692,27 @@ input, textarea, select { font-family: inherit; }
 .modal-head { padding: 18px 22px 0; }
 .modal-title { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
 .modal-sub { font-size: 13px; color: var(--text-2); margin: 0; }
-.modal-body { padding: 16px 22px; }
+.modal-body { padding: 16px 22px; min-width: 0; }
+.modal-connect-host {
+  width: min(620px, calc(100vw - 32px));
+}
+.modal-connect-host .modal-body {
+  display: grid;
+  gap: 12px;
+  overflow-x: hidden;
+}
+.modal-connect-host .command-block {
+  min-width: 0;
+}
+.modal-connect-host .code-block {
+  margin: 0;
+  padding: 14px 44px 14px 16px;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
 .modal-foot {
   padding: 14px 22px;
   display: flex; justify-content: flex-end; gap: 8px;

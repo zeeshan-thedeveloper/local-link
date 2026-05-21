@@ -1,5 +1,5 @@
 {
-  "name": "locallink-sample-backend",
+  "name": "@locallink-examples/local-db",
   "version": "1.0.0",
   "private": true,
   "type": "module",

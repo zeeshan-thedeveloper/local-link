@@ -513,63 +513,75 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     return { hosts: tunnel.connectedHosts() };
   });
 
-  app.all<{ Params: { resourceId: string; "*": string } }>(
-    "/r/:resourceId/*",
-    async (request, reply) => {
-      const started = Date.now();
-      const apiKeyValue = extractApiKey(request);
-      if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
+  const proxyResource = async (
+    request: FastifyRequest<{ Params: { resourceId: string; "*"?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const started = Date.now();
+    const apiKeyValue = extractApiKey(request);
+    if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
 
-      const apiKey = await prisma.apiKey.findUnique({
-        where: { keyHash: hashApiKey(apiKeyValue) },
-      });
-      if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
-        return reply.code(403).send({ error: "Invalid API key" });
-      }
+    const apiKey = await prisma.apiKey.findUnique({
+      where: { keyHash: hashApiKey(apiKeyValue) },
+    });
+    if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
+      return reply.code(403).send({ error: "Invalid API key" });
+    }
 
-      const resource = await prisma.resource.findUnique({
-        where: { id: request.params.resourceId },
-      });
-      if (!resource || !resource.active)
-        return reply.code(404).send({ error: "Resource not found" });
+    const resource = await prisma.resource.findUnique({
+      where: { id: request.params.resourceId },
+    });
+    if (!resource || !resource.active) return reply.code(404).send({ error: "Resource not found" });
 
-      const targetPath = `/${request.params["*"] ?? ""}${request.url.includes("?") ? `?${request.url.split("?")[1]}` : ""}`;
-      const response = await tunnel.send(resource.hostId, {
-        requestId: randomUUID(),
-        resourceId: resource.id,
-        method: request.method,
-        path: targetPath,
-        headers: normalizeHeaders(request.headers),
-        body:
-          typeof request.body === "string"
-            ? request.body
-            : request.body
-              ? JSON.stringify(request.body)
-              : null,
-      });
+    const targetPath = buildProxyTargetPath(request);
+    const response = await tunnel.send(resource.hostId, {
+      requestId: randomUUID(),
+      resourceId: resource.id,
+      method: request.method,
+      path: targetPath,
+      headers: normalizeHeaders(request.headers),
+      body:
+        typeof request.body === "string"
+          ? request.body
+          : request.body
+            ? JSON.stringify(request.body)
+            : null,
+    });
 
-      await Promise.all([
-        prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } }),
-        prisma.requestLog.create({
-          data: {
-            resourceId: resource.id,
-            apiKeyId: apiKey.id,
-            method: request.method,
-            path: targetPath,
-            statusCode: response.statusCode,
-            durationMs: Date.now() - started,
-          },
-        }),
-      ]);
+    await Promise.all([
+      prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } }),
+      prisma.requestLog.create({
+        data: {
+          resourceId: resource.id,
+          apiKeyId: apiKey.id,
+          method: request.method,
+          path: targetPath,
+          statusCode: response.statusCode,
+          durationMs: Date.now() - started,
+        },
+      }),
+    ]);
 
-      for (const [key, value] of Object.entries(response.headers)) {
-        reply.header(key, value);
-      }
-      return reply.code(response.statusCode).send(response.body);
-    },
-  );
+    for (const [key, value] of Object.entries(response.headers)) {
+      reply.header(key, value);
+    }
+    return reply.code(response.statusCode).send(response.body);
+  };
+
+  app.all<{ Params: { resourceId: string } }>("/r/:resourceId", proxyResource);
+  app.all<{ Params: { resourceId: string; "*": string } }>("/r/:resourceId/*", proxyResource);
 
   return app;
+}
+
+function buildProxyTargetPath(
+  request: FastifyRequest<{ Params: { resourceId: string; "*"?: string } }>,
+) {
+  const query = request.url.includes("?") ? `?${request.url.split("?")[1]}` : "";
+  const suffix = request.params["*"];
+  if (suffix === undefined) return `/${query}`;
+  const path = suffix ? `/${suffix}` : "/";
+  return `${path}${query}`;
 }
 
 function extractApiKey(request: FastifyRequest) {
