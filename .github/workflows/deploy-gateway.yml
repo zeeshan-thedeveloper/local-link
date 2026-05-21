@@ -6,11 +6,18 @@ on:
     paths:
       - "services/gateway/**"
       - "packages/**"
+      - "docker-compose.gateway.prod.yml"
+      - "scripts/deploy-gateway-remote.sh"
+      - ".github/workflows/deploy-gateway.yml"
   pull_request:
     branches: [main]
     paths:
       - "services/gateway/**"
       - "packages/**"
+      - "docker-compose.gateway.prod.yml"
+      - "scripts/deploy-gateway-remote.sh"
+      - ".github/workflows/deploy-gateway.yml"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,7 +28,6 @@ jobs:
       packages: write
     outputs:
       image-tag: ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
-      short-sha: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +49,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/locallink-gateway:latest
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
 
@@ -57,105 +64,80 @@ jobs:
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Skip staging deploy when SSH secrets are missing
         if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
         run: |
           echo "Skipping staging deploy because one or more required secrets are missing."
           echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
 
+      - name: Copy deploy files to droplet
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_KEY }}
+          source: "docker-compose.gateway.prod.yml,scripts/deploy-gateway-remote.sh"
+          target: "~/apps/locallink"
+          strip_components: 0
+
       - name: Deploy staging container via SSH
         if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
         uses: appleboy/ssh-action@v1
         with:
-          # Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY.
           host: ${{ env.DEPLOY_HOST }}
           username: ${{ env.DEPLOY_USER }}
           key: ${{ env.DEPLOY_KEY }}
           script: |
-            docker pull ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
-
-            docker run --rm \
-              --env-file ~/apps/locallink/.env.staging \
-              ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }} \
-              pnpm --filter @locallink/gateway prisma migrate deploy
-
-            docker stop locallink-gateway-staging 2>/dev/null || true
-            docker rm locallink-gateway-staging 2>/dev/null || true
-            docker run -d \
-              --name locallink-gateway-staging \
-              --restart unless-stopped \
-              --env-file ~/apps/locallink/.env.staging \
-              -p 3004:3003 \
-              ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
-
-            for i in $(seq 1 12); do
-              if curl -sf http://localhost:3004/health; then
-                echo "Staging is healthy"
-                exit 0
-              fi
-              echo "Waiting for staging... attempt $i/12"
-              sleep 5
-            done
-            echo "Staging health check failed"
-            exit 1
+            chmod +x ~/apps/locallink/scripts/deploy-gateway-remote.sh
+            APP_DIR=~/apps/locallink \
+            ENV_FILE=~/apps/locallink/.env.staging \
+            COMPOSE_FILE=~/apps/locallink/docker-compose.gateway.prod.yml \
+            COMPOSE_PROJECT_NAME=locallink-staging \
+            GATEWAY_PORT=3004 \
+            GATEWAY_IMAGE=ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }} \
+              ~/apps/locallink/scripts/deploy-gateway-remote.sh
 
   deploy-production:
     name: Deploy to Production
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment: production
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Skip production deploy when SSH secrets are missing
         if: env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_KEY == ''
         run: |
           echo "Skipping production deploy because one or more required secrets are missing."
           echo "Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY."
 
-      - name: Deploy production container via SSH
+      - name: Copy deploy files to droplet
+        if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_KEY }}
+          source: "docker-compose.gateway.prod.yml,scripts/deploy-gateway-remote.sh"
+          target: "~/apps/locallink"
+          strip_components: 0
+
+      - name: Deploy production gateway on droplet
         if: env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_KEY != ''
         uses: appleboy/ssh-action@v1
         with:
-          # Required GitHub Actions secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY.
           host: ${{ env.DEPLOY_HOST }}
           username: ${{ env.DEPLOY_USER }}
           key: ${{ env.DEPLOY_KEY }}
           script: |
-            PREV_IMAGE=$(docker inspect --format='{{.Image}}' locallink-gateway 2>/dev/null || echo "")
-
-            docker pull ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }}
-
-            docker run --rm \
-              --env-file ~/apps/locallink/.env \
-              ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }} \
-              pnpm --filter @locallink/gateway prisma migrate deploy
-
-            cd ~/apps/locallink
+            chmod +x ~/apps/locallink/scripts/deploy-gateway-remote.sh
             GATEWAY_IMAGE=ghcr.io/${{ github.repository_owner }}/locallink-gateway:${{ github.sha }} \
-              docker compose up -d --no-deps gateway
-
-            for i in $(seq 1 12); do
-              if curl -sf http://localhost:3003/health; then
-                echo "Production deploy successful"
-                exit 0
-              fi
-              echo "Waiting... attempt $i/12"
-              sleep 5
-            done
-
-            echo "Health check failed, rolling back to $PREV_IMAGE"
-            if [ -n "$PREV_IMAGE" ]; then
-              docker stop locallink-gateway
-              docker rm locallink-gateway
-              docker run -d \
-                --name locallink-gateway \
-                --restart unless-stopped \
-                --env-file ~/apps/locallink/.env \
-                -p 3003:3003 \
-                "$PREV_IMAGE"
-            fi
-            exit 1
+              ~/apps/locallink/scripts/deploy-gateway-remote.sh
