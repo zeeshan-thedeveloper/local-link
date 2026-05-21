@@ -1,5 +1,6 @@
 export default {
   extends: ["@commitlint/config-conventional"],
+  ignores: [(message) => /^chore: version packages$/i.test(message.trim())],
   rules: {
     "type-enum": [
       2,
