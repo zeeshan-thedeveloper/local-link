@@ -5,6 +5,8 @@ export type ResourceType = (typeof resourceTypes)[number];
 export type HttpResourceConfig = {
   type: "http-api";
   url: string;
+  /** When true, the gateway URL works in a browser without an API key. */
+  publicAccess?: boolean;
   headers?: Record<string, string>;
 };
 
@@ -22,10 +24,7 @@ export type AiModelResourceConfig = {
   model: string;
 };
 
-export type ResourceConfig =
-  | HttpResourceConfig
-  | DatabaseResourceConfig
-  | AiModelResourceConfig;
+export type ResourceConfig = HttpResourceConfig | DatabaseResourceConfig | AiModelResourceConfig;
 
 type ResourceBase = {
   id: string;

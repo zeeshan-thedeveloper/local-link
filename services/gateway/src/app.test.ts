@@ -249,4 +249,55 @@ describe("gateway app", () => {
     );
     await app.close();
   });
+
+  it("proxies public HTTP resources without an API key", async () => {
+    const send = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      headers: { "content-type": "text/html" },
+      body: "<html>ok</html>",
+    });
+    prisma.state.resources.push({
+      id: "res_public",
+      name: "Public site",
+      type: "http_api",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:25543", publicAccess: true },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send },
+    });
+
+    const response = await app.inject({ method: "GET", url: "/r/res_public" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe("<html>ok</html>");
+    expect(send).toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("still requires an API key for private HTTP resources", async () => {
+    prisma.state.resources.push({
+      id: "res_private",
+      name: "Private API",
+      type: "http_api",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:8080" },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
+    });
+
+    const response = await app.inject({ method: "GET", url: "/r/res_private" });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "Missing API key" });
+    await app.close();
+  });
 });
