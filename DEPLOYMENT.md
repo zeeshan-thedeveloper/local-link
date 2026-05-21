@@ -20,6 +20,28 @@
   - `GITHUB_CLIENT_SECRET`
   - `BETTER_AUTH_SECRET`
   - `RESEND_API_KEY`
+  - `NPM_TOKEN` (optional legacy token; prefer npm **trusted publishing** for `@locallink/cli`)
+
+## Publish `@locallink/cli` to npm
+
+The **Release** workflow (`.github/workflows/release.yml`) publishes the CLI using [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC).
+
+On [npmjs.com](https://www.npmjs.com/), open **@locallink/cli → Settings → Trusted publishing** and add:
+
+| Field | Value |
+|--------|--------|
+| Provider | GitHub Actions |
+| Repository | `zeeshan-thedeveloper/local-link` |
+| Workflow filename | `release.yml` |
+| Environment | (leave empty) |
+
+After merging changesets version PRs, push to `main` or run **Actions → Release → Run workflow**. Verify with:
+
+```bash
+npm view @locallink/cli version
+```
+
+If publish fails with auth errors, refresh `NPM_TOKEN` in GitHub secrets **or** confirm trusted publishing is configured for `release.yml`.
 
 ## Normal Deployment
 
