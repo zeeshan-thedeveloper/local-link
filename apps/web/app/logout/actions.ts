@@ -11,10 +11,10 @@ export async function logout() {
   if (session) {
     await fetch(`${gatewayUrl}/auth/logout`, {
       method: "POST",
-      headers: { cookie: `locallink_session=${session.value}` }
+      headers: { cookie: `locallink_session=${session.value}` },
     }).catch(() => {});
     cookieStore.delete("locallink_session");
   }
 
-  redirect("/");
+  redirect("/login");
 }

@@ -1,32 +1,53 @@
 "use server";
 
+import type { CurrentUser } from "@/lib/gateway";
 import { gatewayUrl } from "@/lib/gateway";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
-export async function login(formData: FormData) {
+export type LoginState =
+  | { ok: false; error: "credentials" | "session" }
+  | { ok: true; user: CurrentUser }
+  | null;
+
+export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const response = await fetch(`${gatewayUrl}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email: formData.get("email"),
-      password: formData.get("password")
-    })
+      password: formData.get("password"),
+    }),
   });
-  if (!response.ok) redirect("/login?error=1");
+  if (!response.ok) return { ok: false, error: "credentials" };
 
   const token = getSessionToken(response.headers);
-  if (!token) redirect("/login?error=session");
+  if (!token) return { ok: false, error: "session" };
+
+  const body = (await response.json()) as {
+    user?: { id: string; email: string; name?: string | null };
+  };
 
   const cookieStore = await cookies();
   cookieStore.set("locallink_session", token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: 60 * 60 * 24 * 7,
   });
 
-  redirect("/dashboard");
+  const gatewayUser = body.user;
+  if (!gatewayUser?.id || !gatewayUser.email) {
+    return { ok: false, error: "session" };
+  }
+
+  return {
+    ok: true,
+    user: {
+      id: gatewayUser.id,
+      email: gatewayUser.email,
+      name: gatewayUser.name ?? null,
+    },
+  };
 }
 
 function getSessionToken(headers: Headers) {
