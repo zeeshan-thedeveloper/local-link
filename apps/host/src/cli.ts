@@ -82,11 +82,7 @@ program
 
     const shouldStart = await confirm({ message: "Start the tunnel now?", default: true });
     if (shouldStart) {
-      renderDashboard(
-        config.gatewayUrl,
-        config.resources.map((r) => r.name),
-      );
-      startDaemon(config, (event) => logDaemonEvent(event));
+      runDaemonDashboard(config);
     } else {
       process.stdout.write("Run `locallink start` when ready.\n");
     }
@@ -94,11 +90,7 @@ program
 
 program.command("start").action(async () => {
   const config = await loadConfig();
-  renderDashboard(
-    config.gatewayUrl,
-    config.resources.map((r) => r.name),
-  );
-  startDaemon(config, (event) => logDaemonEvent(event));
+  runDaemonDashboard(config);
 });
 
 program
@@ -321,47 +313,86 @@ const C = {
   gray: "\x1b[90m",
 };
 
-function renderDashboard(gatewayUrl: string, resourceNames: string[]) {
-  const w = process.stdout.columns || 72;
-  const line = "─".repeat(w);
-  process.stdout.write("\x1bc"); // clear screen
-  process.stdout.write(
-    `${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${gatewayUrl}${C.reset}\n`,
+type TunnelStatus = "connecting" | "connected" | "disconnected" | "error";
+
+function runDaemonDashboard(config: Awaited<ReturnType<typeof loadConfig>>) {
+  const tunnelStatus = new Map<string, TunnelStatus>(
+    config.resources.map((resource) => [resource.name, "connecting"]),
   );
-  process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
-  process.stdout.write(`${C.bold}  Tunnels${C.reset}\n`);
-  for (const name of resourceNames) {
-    process.stdout.write(`  ${C.dim}◌${C.reset}  ${name}  ${C.dim}connecting…${C.reset}\n`);
-  }
-  process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
-  process.stdout.write(`${C.bold}  Requests${C.reset}\n\n`);
+  const requestLines: string[] = [];
+
+  const render = () => {
+    const w = process.stdout.columns || 72;
+    const line = "─".repeat(w);
+    process.stdout.write("\x1bc");
+    process.stdout.write(
+      `${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${config.gatewayUrl}${C.reset}\n`,
+    );
+    process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
+    process.stdout.write(`${C.bold}  Tunnels${C.reset}\n`);
+    for (const resource of config.resources) {
+      const status = tunnelStatus.get(resource.name) ?? "connecting";
+      if (status === "connected") {
+        process.stdout.write(
+          `  ${C.green}●${C.reset}  ${C.bold}${resource.name}${C.reset}  ${C.green}connected${C.reset}\n`,
+        );
+      } else if (status === "disconnected") {
+        process.stdout.write(
+          `  ${C.red}●${C.reset}  ${C.bold}${resource.name}${C.reset}  ${C.red}disconnected${C.reset}\n`,
+        );
+      } else if (status === "error") {
+        process.stdout.write(
+          `  ${C.red}●${C.reset}  ${C.bold}${resource.name}${C.reset}  ${C.red}error${C.reset}\n`,
+        );
+      } else {
+        process.stdout.write(
+          `  ${C.dim}◌${C.reset}  ${resource.name}  ${C.dim}connecting…${C.reset}\n`,
+        );
+      }
+    }
+    process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
+    process.stdout.write(`${C.bold}  Requests${C.reset}\n\n`);
+    for (const entry of requestLines) process.stdout.write(entry);
+  };
+
+  render();
+  startDaemon(config, (event) => {
+    if (event.type === "connected") tunnelStatus.set(event.resource.name, "connected");
+    else if (event.type === "disconnected") tunnelStatus.set(event.resource.name, "disconnected");
+    else if (event.type === "connect_error") tunnelStatus.set(event.resource.name, "error");
+
+    const line = formatDaemonEventLine(event);
+    requestLines.push(line);
+
+    if (
+      event.type === "connected" ||
+      event.type === "disconnected" ||
+      event.type === "connect_error"
+    ) {
+      render();
+      return;
+    }
+
+    process.stdout.write(line);
+  });
 }
 
-function logDaemonEvent(event: DaemonEvent) {
+function formatDaemonEventLine(event: DaemonEvent) {
   const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
   if (event.type === "connected") {
-    process.stdout.write(
-      `  ${C.green}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.green}connected${C.reset}\n`,
-    );
-  } else if (event.type === "disconnected") {
-    process.stdout.write(
-      `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}disconnected${C.reset}\n`,
-    );
-  } else if (event.type === "connect_error") {
-    process.stdout.write(
-      `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}error: ${event.message}${C.reset}\n`,
-    );
-  } else {
-    const statusColor =
-      event.statusCode < 300 ? C.green : event.statusCode < 500 ? C.yellow : C.red;
-    const dur =
-      event.durationMs < 1000
-        ? `${event.durationMs}ms`
-        : `${(event.durationMs / 1000).toFixed(1)}s`;
-    process.stdout.write(
-      `  ${C.gray}${ts}${C.reset}  ${C.dim}${event.resource.name}${C.reset}  ${C.bold}${event.method.padEnd(6)}${C.reset}  ${event.path}  ${statusColor}${event.statusCode}${C.reset}  ${C.dim}${dur}${C.reset}\n`,
-    );
+    return `  ${C.green}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.green}connected${C.reset}\n`;
   }
+  if (event.type === "disconnected") {
+    return `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}disconnected${C.reset}\n`;
+  }
+  if (event.type === "connect_error") {
+    return `  ${C.red}●${C.reset}  ${C.bold}${event.resource.name}${C.reset}  ${C.red}error: ${event.message}${C.reset}\n`;
+  }
+
+  const statusColor = event.statusCode < 300 ? C.green : event.statusCode < 500 ? C.yellow : C.red;
+  const dur =
+    event.durationMs < 1000 ? `${event.durationMs}ms` : `${(event.durationMs / 1000).toFixed(1)}s`;
+  return `  ${C.gray}${ts}${C.reset}  ${C.dim}${event.resource.name}${C.reset}  ${C.bold}${event.method.padEnd(6)}${C.reset}  ${event.path}  ${statusColor}${event.statusCode}${C.reset}  ${C.dim}${dur}${C.reset}\n`;
 }
 
 function trimTrailingSlash(value: string) {

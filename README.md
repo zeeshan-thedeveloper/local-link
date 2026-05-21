@@ -10,6 +10,8 @@ LocalLink is a personal API gateway for local resources. The gateway validates p
 - `packages/shared` - shared TypeScript types
 - `packages/validators` - Zod request and tunnel schemas
 - `packages/tsconfig` - shared TypeScript configuration
+- `examples/local-db` - Express API demo using `@locallink/client` against a tunneled Postgres resource
+- `examples/http` - Vite React app on port `25543` for end-to-end HTTP proxy testing
 
 ## Development
 
