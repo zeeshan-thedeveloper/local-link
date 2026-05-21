@@ -3,6 +3,10 @@ import { confirm, input, password } from "@inquirer/prompts";
 import { Command } from "commander";
 import { createDefaultConfig, loadConfig, saveConfig, type HostResourceConfig } from "./config.js";
 import { startDaemon, type DaemonEvent } from "./daemon.js";
+import {
+  describeResourceConfig,
+  normalizeGatewayResourceConfig,
+} from "./resource-config.js";
 
 const program = new Command();
 
@@ -26,7 +30,10 @@ program
         name: host.name,
         type: host.type,
         token: options.token,
-        config: existing?.config ?? defaultResourceConfig(host.type),
+        config:
+          existing?.config ??
+          normalizeGatewayResourceConfig(host.type, host.config, host.name) ??
+          defaultResourceConfig(host.type),
       } as HostResourceConfig,
     ];
     await saveConfig(config);
@@ -65,7 +72,7 @@ program
     const config = existingConfig ?? createDefaultConfig(gatewayUrl);
     config.gatewayUrl = host.gatewayUrl ?? gatewayUrl;
     const existing = config.resources.find((resource) => resource.id === host.resourceId);
-    const resourceConfig = await promptForResourceConfig(host, existing);
+    const resourceConfig = await resolveResourceConfig(host, existing);
 
     config.resources = [
       ...config.resources.filter((resource) => resource.id !== host.resourceId),
@@ -177,20 +184,32 @@ async function verifyHostToken(gatewayUrl: string, token: string): Promise<HostL
   return response.json() as Promise<HostLookup>;
 }
 
-async function promptForResourceConfig(
+async function resolveResourceConfig(
   host: HostLookup,
   existing?: HostResourceConfig,
 ): Promise<HostResourceConfig["config"]> {
+  const fromGateway = normalizeGatewayResourceConfig(host.type, host.config, host.name);
+  if (fromGateway) {
+    process.stdout.write(
+      `Using dashboard config (${describeResourceConfig(fromGateway)}).\n`,
+    );
+    return fromGateway;
+  }
+
+  if (existing?.type === host.type) {
+    process.stdout.write(
+      `Using saved local config (${describeResourceConfig(existing.config)}).\n`,
+    );
+    return existing.config;
+  }
+
+  return promptForMissingResourceConfig(host);
+}
+
+async function promptForMissingResourceConfig(
+  host: HostLookup,
+): Promise<HostResourceConfig["config"]> {
   if (host.type === "database") {
-    const serverConnectionString =
-      host.config?.type === "database" ? host.config.connectionString : undefined;
-    const existingConnectionString =
-      existing?.type === "database" ? existing.config.connectionString : undefined;
-    const defaultConnectionString = existingConnectionString ?? serverConnectionString;
-    if (defaultConnectionString) {
-      process.stdout.write(`Using connection string from gateway config.\n`);
-      return { type: "database", engine: "postgres", connectionString: defaultConnectionString };
-    }
     const connectionString = await input({
       message: "Postgres connection string:",
       default: "postgresql://locallink:locallink@localhost:5433/locallink",
@@ -198,13 +217,6 @@ async function promptForResourceConfig(
     return { type: "database", engine: "postgres", connectionString };
   }
   if (host.type === "http-api") {
-    const serverUrl = host.config?.type === "http-api" ? host.config.url : undefined;
-    const existingUrl = existing?.type === "http-api" ? existing.config.url : undefined;
-    const defaultUrl = existingUrl ?? serverUrl;
-    if (defaultUrl) {
-      process.stdout.write(`Using URL from gateway config.\n`);
-      return { type: "http-api", url: defaultUrl };
-    }
     const url = await input({
       message: "Local HTTP base URL:",
       default: "http://localhost:3000",
@@ -212,18 +224,6 @@ async function promptForResourceConfig(
     return { type: "http-api", url };
   }
 
-  const serverBaseUrl = host.config?.type === "ai-model" ? host.config.baseUrl : undefined;
-  const existingBaseUrl = existing?.type === "ai-model" ? existing.config.baseUrl : undefined;
-  const defaultBaseUrl = existingBaseUrl ?? serverBaseUrl;
-  if (defaultBaseUrl) {
-    process.stdout.write(`Using base URL from gateway config.\n`);
-    return {
-      type: "ai-model",
-      provider: "openai-compatible",
-      baseUrl: defaultBaseUrl,
-      model: host.name,
-    };
-  }
   const baseUrl = await input({
     message: "Local HTTP base URL:",
     default: "http://localhost:3000",

@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import type { HostConfig, HostResourceConfig } from "./config.js";
 import { proxyRequest } from "./proxy.js";
+import { normalizeGatewayResourceConfig } from "./resource-config.js";
 
 export type DaemonEvent =
   | { type: "connected"; resource: HostResourceConfig }
@@ -34,10 +35,15 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
 
   socket.on("connect", () => {
     void fetchLatestConfig(gatewayUrl, resource.token).then((latest) => {
-      if (latest?.config) {
-        liveResource = { ...resource, config: latest.config as typeof resource.config } as HostResourceConfig;
+      const normalized = normalizeGatewayResourceConfig(
+        resource.type,
+        latest?.config,
+        resource.name,
+      );
+      if (normalized) {
+        liveResource = { ...resource, config: normalized } as HostResourceConfig;
       }
-      onEvent({ type: "connected", resource });
+      onEvent({ type: "connected", resource: liveResource });
     });
   });
   socket.on("connect_error", (error) => onEvent({ type: "connect_error", resource, message: error.message }));
