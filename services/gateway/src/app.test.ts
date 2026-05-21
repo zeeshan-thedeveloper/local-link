@@ -244,7 +244,7 @@ describe("gateway app", () => {
 
     expect(response.statusCode).toBe(200);
     expect(send).toHaveBeenCalledWith(
-      "host_1",
+      "res_http",
       expect.objectContaining({ resourceId: "res_http", method: "GET", path: "/" }),
     );
     await app.close();

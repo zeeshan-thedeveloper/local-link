@@ -1,3 +1,5 @@
+export { TUNNEL_MAX_HTTP_BUFFER_SIZE } from "./tunnel.js";
+
 export const resourceTypes = ["database", "ai-model", "http-api"] as const;
 
 export type ResourceType = (typeof resourceTypes)[number];

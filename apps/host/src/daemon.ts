@@ -1,3 +1,4 @@
+import { TUNNEL_MAX_HTTP_BUFFER_SIZE } from "@locallink/shared";
 import { io, type Socket } from "socket.io-client";
 import type { HostConfig, HostResourceConfig } from "./config.js";
 import { proxyRequest } from "./proxy.js";
@@ -7,16 +8,28 @@ export type DaemonEvent =
   | { type: "connected"; resource: HostResourceConfig }
   | { type: "disconnected"; resource: HostResourceConfig }
   | { type: "connect_error"; resource: HostResourceConfig; message: string }
-  | { type: "request"; resource: HostResourceConfig; method: string; path: string; statusCode: number; durationMs: number };
+  | {
+      type: "request";
+      resource: HostResourceConfig;
+      method: string;
+      path: string;
+      statusCode: number;
+      durationMs: number;
+    };
 
 export function startDaemon(config: HostConfig, onEvent: (event: DaemonEvent) => void): Socket[] {
-  return config.resources.map((resource) => startResourceDaemon(config.gatewayUrl, resource, onEvent));
+  return config.resources.map((resource) =>
+    startResourceDaemon(config.gatewayUrl, resource, onEvent),
+  );
 }
 
-async function fetchLatestConfig(gatewayUrl: string, token: string): Promise<{ config: unknown } | null> {
+async function fetchLatestConfig(
+  gatewayUrl: string,
+  token: string,
+): Promise<{ config: unknown } | null> {
   try {
     const res = await fetch(`${gatewayUrl}/hosts/me`, {
-      headers: { authorization: `Bearer ${token}` }
+      headers: { authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
     return res.json() as Promise<{ config: unknown }>;
@@ -25,12 +38,17 @@ async function fetchLatestConfig(gatewayUrl: string, token: string): Promise<{ c
   }
 }
 
-function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, onEvent: (event: DaemonEvent) => void): Socket {
+function startResourceDaemon(
+  gatewayUrl: string,
+  resource: HostResourceConfig,
+  onEvent: (event: DaemonEvent) => void,
+): Socket {
   let liveResource = resource;
 
   const socket = io(gatewayUrl, {
     auth: { token: resource.token },
-    transports: ["websocket"]
+    transports: ["websocket"],
+    maxHttpBufferSize: TUNNEL_MAX_HTTP_BUFFER_SIZE,
   });
 
   socket.on("connect", () => {
@@ -46,7 +64,9 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
       onEvent({ type: "connected", resource: liveResource });
     });
   });
-  socket.on("connect_error", (error) => onEvent({ type: "connect_error", resource, message: error.message }));
+  socket.on("connect_error", (error) =>
+    onEvent({ type: "connect_error", resource, message: error.message }),
+  );
   socket.on("disconnect", () => onEvent({ type: "disconnected", resource }));
 
   socket.on("proxy:request", async (request) => {
@@ -55,7 +75,7 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
         requestId: request.requestId,
         statusCode: 404,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ error: "Local resource is not registered on this host" })
+        body: JSON.stringify({ error: "Local resource is not registered on this host" }),
       });
       return;
     }
@@ -69,7 +89,7 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
         method: request.method,
         path: request.path,
         statusCode: response.statusCode,
-        durationMs: Date.now() - start
+        durationMs: Date.now() - start,
       });
       socket.emit("proxy:response", response);
     } catch (error) {
@@ -79,13 +99,13 @@ function startResourceDaemon(gatewayUrl: string, resource: HostResourceConfig, o
         method: request.method,
         path: request.path,
         statusCode: 502,
-        durationMs: Date.now() - start
+        durationMs: Date.now() - start,
       });
       socket.emit("proxy:response", {
         requestId: request.requestId,
         statusCode: 502,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ error: error instanceof Error ? error.message : "Proxy failed" })
+        body: JSON.stringify({ error: error instanceof Error ? error.message : "Proxy failed" }),
       });
     }
   });
