@@ -25,6 +25,10 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=build --chown=gateway:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=gateway:nodejs /app/packages ./packages
 COPY --from=build --chown=gateway:nodejs /app/services/gateway ./services/gateway
+# Wrapper so deploy can run `prisma migrate deploy` without pnpm workspace
+RUN PRISMA_JS="$(find /app/node_modules -path '*/prisma/build/index.js' | head -1)" && \
+    printf '%s\n' '#!/bin/sh' "exec node \"$PRISMA_JS\" \"\$@\"" > /usr/local/bin/prisma && \
+    chmod +x /usr/local/bin/prisma
 WORKDIR /app/services/gateway
 USER gateway
 EXPOSE 3003
