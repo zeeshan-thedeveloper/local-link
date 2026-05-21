@@ -20,6 +20,13 @@ describe("proxy-rewrite", () => {
     );
   });
 
+  it("does not rewrite self-closing HTML tags", () => {
+    const html = '<meta charset="UTF-8" />\n<link rel="icon" href="/favicon.ico" />';
+    const rewritten = rewriteRootPathsForGatewayPrefix(html, "/r/res_1");
+    expect(rewritten).toContain('<meta charset="UTF-8" />');
+    expect(rewritten).toContain('href="/r/res_1/favicon.ico"');
+  });
+
   it("does not rewrite protocol-relative or external URLs", () => {
     const body = '<a href="//cdn.example.com/x">x</a><img src="https://x.com/a.png">';
     expect(rewriteRootPathsForGatewayPrefix(body, "/r/res_1")).toBe(body);
