@@ -75,7 +75,7 @@ Success means `/health` returns `200` again.
 Run migrations before switching traffic to a new image:
 
 ```sh
-docker run --rm --env-file ~/apps/locallink/.env ghcr.io/<owner>/locallink-gateway:<sha> pnpm --filter @locallink/gateway prisma migrate deploy
+docker run --rm --env-file ~/apps/locallink/.env -w /app/services/gateway ghcr.io/<owner>/locallink-gateway:<sha> sh -c '/app/node_modules/.bin/prisma migrate deploy'
 ```
 
 Prisma migrations are forward-only. To recover from a bad migration, restore from the latest database backup or deploy a corrective migration.
