@@ -559,7 +559,7 @@ function RequestsTable({
 }
 
 type DbConfig = { engine: string; connectionString?: string; filePath?: string };
-type HttpConfig = { url: string; headers?: Record<string, string> };
+type HttpConfig = { url: string; publicAccess?: boolean; headers?: Record<string, string> };
 
 function ConfigSection({
   resource,
@@ -577,7 +577,16 @@ function ConfigSection({
   const [configTab, setConfigTab] = useState<"local" | "gateway">("local");
   const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
   const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
+  const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
   const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const http = config as HttpConfig | undefined;
+    if (isHttp && http) {
+      setHttpUrl(http.url ?? "");
+      setPublicAccess(http.publicAccess ?? false);
+    }
+  }, [resource.id, resource.config, isHttp, config]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -588,7 +597,7 @@ function ConfigSection({
     try {
       const newConfig = isDb
         ? { engine: (config as DbConfig)?.engine ?? "postgres", connectionString: connStr }
-        : { url: httpUrl };
+        : { url: httpUrl, publicAccess };
       const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -663,16 +672,39 @@ function ConfigSection({
               )}
 
               {isHttp && (
-                <div className="field">
-                  <div className="field-label">Base URL</div>
-                  <input
-                    className="input"
-                    type="text"
-                    value={httpUrl}
-                    onChange={(e) => setHttpUrl(e.target.value)}
-                    placeholder="http://localhost:8080"
-                  />
-                </div>
+                <>
+                  <div className="field">
+                    <div className="field-label">Local URL</div>
+                    <input
+                      className="input"
+                      type="text"
+                      value={httpUrl}
+                      onChange={(e) => setHttpUrl(e.target.value)}
+                      placeholder="http://localhost:25543"
+                    />
+                  </div>
+                  <div className="field">
+                    <label
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={publicAccess}
+                        onChange={(e) => setPublicAccess(e.target.checked)}
+                        style={{ marginTop: 3 }}
+                      />
+                      <span>
+                        <strong>Public gateway URL</strong> — browser can open{" "}
+                        <span className="mono">{endpoint}</span> without an API key
+                      </span>
+                    </label>
+                  </div>
+                </>
               )}
 
               <div className="field-help">
@@ -725,12 +757,19 @@ function ConfigSection({
               </dl>
               {resource.type === "http-api" ? (
                 <p className="field-help" style={{ marginTop: 12 }}>
-                  Requests require an API key (<span className="mono">Authorization: Bearer …</span>{" "}
-                  or <span className="mono">x-api-key</span>). Opening the gateway URL in a browser
-                  without a key returns 401. Create a key under the API Keys tab, then test with{" "}
-                  <span className="mono">
-                    curl -H &quot;Authorization: Bearer &lt;key&gt;&quot; {endpoint}
-                  </span>
+                  {(config as HttpConfig)?.publicAccess ? (
+                    <>
+                      This local website is <strong>public</strong>: open the gateway URL in a
+                      browser while the host is connected. Use API keys only for scripted clients.
+                    </>
+                  ) : (
+                    <>
+                      Requests require an API key (
+                      <span className="mono">Authorization: Bearer …</span> or{" "}
+                      <span className="mono">x-api-key</span>). Enable &quot;Public gateway
+                      URL&quot; under Local Match to allow browser access.
+                    </>
+                  )}
                 </p>
               ) : null}
             </>

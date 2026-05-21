@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  apiKeyCreationSchema,
-  resourceRegistrationSchema,
-  tunnelMessageSchema
-} from "./index.js";
+import { apiKeyCreationSchema, resourceRegistrationSchema, tunnelMessageSchema } from "./index.js";
 
 describe("validators", () => {
   it("accepts a valid HTTP resource registration", () => {
@@ -12,9 +8,22 @@ describe("validators", () => {
         name: "Local app",
         type: "http-api",
         hostId: "laptop",
-        config: { url: "http://localhost:8080" }
-      })
+        config: { url: "http://localhost:8080" },
+      }),
     ).toMatchObject({ name: "Local app" });
+  });
+
+  it("accepts public website access on HTTP resources", () => {
+    expect(
+      resourceRegistrationSchema.parse({
+        name: "Vite app",
+        type: "http-api",
+        hostId: "laptop",
+        config: { url: "http://localhost:25543", publicAccess: true },
+      }),
+    ).toMatchObject({
+      config: { url: "http://localhost:25543", publicAccess: true },
+    });
   });
 
   it("requires database connection details", () => {
@@ -23,15 +32,15 @@ describe("validators", () => {
         name: "Database",
         type: "database",
         hostId: "laptop",
-        config: { engine: "postgres" }
-      })
+        config: { engine: "postgres" },
+      }),
     ).toThrow();
   });
 
   it("accepts scoped API key creation", () => {
     expect(apiKeyCreationSchema.parse({ name: "CI", resourceId: "res_123" })).toEqual({
       name: "CI",
-      resourceId: "res_123"
+      resourceId: "res_123",
     });
   });
 
@@ -43,9 +52,9 @@ describe("validators", () => {
           requestId: "req_1",
           statusCode: 200,
           headers: { "content-type": "application/json" },
-          body: "{}"
-        }
-      })
+          body: "{}",
+        },
+      }),
     ).toMatchObject({ type: "proxy:response" });
   });
 });
