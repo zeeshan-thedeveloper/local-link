@@ -554,7 +554,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       resourceId: resource.id,
       method: request.method,
       path: targetPath,
-      headers: normalizeHeaders(request.headers),
+      headers: normalizeProxyRequestHeaders(request.headers),
       body:
         typeof request.body === "string"
           ? request.body
@@ -620,10 +620,12 @@ function extractBearerToken(request: FastifyRequest) {
   return null;
 }
 
-function normalizeHeaders(headers: FastifyRequest["headers"]) {
+const PROXY_DROP_REQUEST_HEADERS = new Set(["accept-encoding", "connection", "content-length"]);
+
+function normalizeProxyRequestHeaders(headers: FastifyRequest["headers"]) {
   return Object.fromEntries(
     Object.entries(headers).flatMap(([key, value]) => {
-      if (!value) return [];
+      if (!value || PROXY_DROP_REQUEST_HEADERS.has(key.toLowerCase())) return [];
       return [[key, Array.isArray(value) ? value.join(",") : String(value)]];
     }),
   );

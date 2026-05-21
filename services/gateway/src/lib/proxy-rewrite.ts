@@ -1,5 +1,5 @@
 const REWRITABLE_CONTENT_TYPES =
-  /^text\/html(?:;|$)|^text\/css(?:;|$)|^application\/javascript(?:;|$)|^text\/javascript(?:;|$)/i;
+  /^text\/html(?:;|$)|^text\/css(?:;|$)|^application\/javascript(?:;|$)|^text\/javascript(?:;|$)|^application\/typescript(?:;|$)|^text\/tsx(?:;|$)|^text\/jsx(?:;|$)/i;
 
 /** Prefix root-absolute paths so assets load under /r/:resourceId/… */
 export function rewriteRootPathsForGatewayPrefix(body: string, prefix: string): string {
@@ -33,11 +33,27 @@ export function rewriteProxiedHttpResponse(
   }
 
   const prefix = `/r/${resourceId}`;
-  const rewritten = rewriteRootPathsForGatewayPrefix(body, prefix);
+  let rewritten = rewriteRootPathsForGatewayPrefix(body, prefix);
+  if (contentType?.toLowerCase().includes("text/html")) {
+    rewritten = injectHtmlBaseHref(rewritten, `${prefix}/`);
+  }
   const nextHeaders = { ...rewriteLocationHeaders(headers, resourceId) };
   delete nextHeaders["content-length"];
   delete nextHeaders["Content-Length"];
+  delete nextHeaders.etag;
+  delete nextHeaders.ETag;
+  delete nextHeaders["last-modified"];
+  delete nextHeaders["Last-Modified"];
+  nextHeaders["cache-control"] = "no-cache";
   return { body: rewritten, headers: nextHeaders };
+}
+
+function injectHtmlBaseHref(html: string, baseHref: string) {
+  if (/<base\s/i.test(html)) return html;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, `<head$1><base href="${baseHref}">`);
+  }
+  return html;
 }
 
 function rewriteLocationHeaders(headers: Record<string, string>, resourceId: string) {
