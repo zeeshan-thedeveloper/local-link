@@ -33,6 +33,7 @@ jobs:
             apps/*/node_modules
             services/*/node_modules
             packages/*/node_modules
+            examples/*/node_modules
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
   lint:
@@ -56,6 +57,7 @@ jobs:
             apps/*/node_modules
             services/*/node_modules
             packages/*/node_modules
+            examples/*/node_modules
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm lint
 
@@ -80,6 +82,7 @@ jobs:
             apps/*/node_modules
             services/*/node_modules
             packages/*/node_modules
+            examples/*/node_modules
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm typecheck
 
@@ -104,6 +107,7 @@ jobs:
             apps/*/node_modules
             services/*/node_modules
             packages/*/node_modules
+            examples/*/node_modules
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm test:coverage
       - name: Upload coverage report
@@ -135,5 +139,6 @@ jobs:
             apps/*/node_modules
             services/*/node_modules
             packages/*/node_modules
+            examples/*/node_modules
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm build
