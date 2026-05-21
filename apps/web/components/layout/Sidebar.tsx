@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BuildBadge } from "@/components/layout/BuildBadge";
 import { Icon } from "@/components/ui/Icon";
 
 export function Sidebar({ connectedHostCount }: { connectedHostCount: number }) {
@@ -11,7 +12,9 @@ export function Sidebar({ connectedHostCount }: { connectedHostCount: number }) 
     { id: "resources", href: "/resources", label: "Resources", icon: "resources", kbd: "G R" },
     { id: "settings", href: "/settings", label: "Settings", icon: "settings", kbd: "G S" },
   ];
-  const activeId = pathname.startsWith("/resources") ? "resources" : pathname.split("/")[1] || "dashboard";
+  const activeId = pathname.startsWith("/resources")
+    ? "resources"
+    : pathname.split("/")[1] || "dashboard";
   const hostConnected = connectedHostCount > 0;
   const hostLabel = hostConnected
     ? `${connectedHostCount} ${connectedHostCount === 1 ? "host" : "hosts"} connected`
@@ -20,12 +23,16 @@ export function Sidebar({ connectedHostCount }: { connectedHostCount: number }) 
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-mark"/>
+        <span className="brand-mark" />
         <span className="name">LocalLink</span>
       </div>
       <nav className="sidebar-nav">
         {items.map((it) => (
-          <Link key={it.id} href={it.href} className={"nav-item " + (activeId === it.id ? "active" : "")}>
+          <Link
+            key={it.id}
+            href={it.href}
+            className={"nav-item " + (activeId === it.id ? "active" : "")}
+          >
             <Icon name={it.icon} size={15} />
             <span>{it.label}</span>
             <span className="kbd">{it.kbd}</span>
@@ -34,10 +41,11 @@ export function Sidebar({ connectedHostCount }: { connectedHostCount: number }) 
       </nav>
       <div className="sidebar-foot">
         <div className={"host-indicator " + (hostConnected ? "" : "disconnected")}>
-          <span className="dot"/>
+          <span className="dot" />
           <span className="label">{hostLabel}</span>
           {hostConnected ? <span className="meta">Live tunnel</span> : null}
         </div>
+        <BuildBadge className="sidebar-build-badge" />
       </div>
     </aside>
   );

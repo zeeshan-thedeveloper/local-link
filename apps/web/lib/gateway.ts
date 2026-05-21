@@ -19,9 +19,9 @@ export async function gatewayFetch<T>(path: string, init: RequestInit = {}): Pro
     headers: {
       "content-type": "application/json",
       cookie: cookieHeader,
-      ...init.headers
+      ...init.headers,
     },
-    cache: "no-store"
+    cache: "no-store",
   });
   if (!response.ok) {
     throw new Error(`Gateway request failed: ${response.status}`);
@@ -31,9 +31,12 @@ export async function gatewayFetch<T>(path: string, init: RequestInit = {}): Pro
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
-    const { user } = await gatewayFetch<{ user?: { email?: string; sub?: string; id?: string; name?: string | null } }>("/auth/me");
-    if (!user?.email || !user.sub) return null;
-    return { email: user.email, id: user.sub, name: user.name };
+    const { user } = await gatewayFetch<{
+      user?: { email?: string; sub?: string; id?: string; name?: string | null };
+    }>("/auth/me");
+    const userId = user?.sub ?? user?.id;
+    if (!user?.email || !userId) return null;
+    return { email: user.email, id: userId, name: user.name };
   } catch {
     return null;
   }

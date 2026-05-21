@@ -16,7 +16,7 @@ export function LoginForm() {
   useEffect(() => {
     if (!state?.ok) return;
     notifyCurrentUserUpdated(state.user);
-    window.location.href = "/dashboard";
+    window.location.replace("/dashboard");
   }, [state]);
 
   return (

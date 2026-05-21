@@ -1,5 +1,6 @@
 "use client";
 
+import { BuildBadge } from "@/components/layout/BuildBadge";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { Icon } from "@/components/ui/Icon";
 import type { CurrentUser } from "@/lib/gateway";
@@ -13,7 +14,13 @@ function initialsForUser(label: string, email: string) {
   return source.slice(0, 2).toUpperCase() || "LL";
 }
 
-export function Topbar({ crumbs, currentUser }: { crumbs: string[]; currentUser: CurrentUser | null }) {
+export function Topbar({
+  crumbs,
+  currentUser,
+}: {
+  crumbs: string[];
+  currentUser: CurrentUser | null;
+}) {
   const { theme, toggleTheme } = useTheme();
   const userEmail = currentUser?.email ?? "Signed out";
   const userLabel = currentUser?.name?.trim() || userEmail;
@@ -29,16 +36,37 @@ export function Topbar({ crumbs, currentUser }: { crumbs: string[]; currentUser:
         ))}
       </div>
       <div className="topbar-right">
-        <button className="btn btn-ghost btn-sm" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          <Icon name={theme === "dark" ? "sun" : "moon"} size={13}/>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        >
+          <Icon name={theme === "dark" ? "sun" : "moon"} size={13} />
         </button>
-        <button className="btn btn-ghost btn-sm"><Icon name="search" size={13}/>Search<span className="kbd" style={{ marginLeft: 4, fontSize: 10, padding: "0 4px", border: "1px solid var(--border)", borderRadius: 3, color: "var(--text-3)" }}>⌘K</span></button>
+        <button className="btn btn-ghost btn-sm">
+          <Icon name="search" size={13} />
+          Search
+          <span
+            className="kbd"
+            style={{
+              marginLeft: 4,
+              fontSize: 10,
+              padding: "0 4px",
+              border: "1px solid var(--border)",
+              borderRadius: 3,
+              color: "var(--text-3)",
+            }}
+          >
+            ⌘K
+          </span>
+        </button>
+        <BuildBadge className="build-badge" />
         <div className="user-menu">
           <div className="avatar">{initialsForUser(userLabel, userEmail)}</div>
           <span title={userEmail}>{userLabel}</span>
           <form action="/logout" method="post">
             <button type="submit" className="btn btn-ghost btn-sm" aria-label="Log out">
-              <Icon name="logout" size={13}/>
+              <Icon name="logout" size={13} />
             </button>
           </form>
         </div>
