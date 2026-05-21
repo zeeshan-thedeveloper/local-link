@@ -16,6 +16,7 @@ import { auth } from "./lib/auth.js";
 import { sendVerificationEmail } from "./lib/email.js";
 import { createApiKey, createHostToken, hashApiKey } from "./lib/keys.js";
 import type { TunnelBroker } from "./lib/tunnel.js";
+import { rewriteProxiedHttpResponse } from "./lib/proxy-rewrite.js";
 import { healthRoutes } from "./routes/health.js";
 
 type AppOptions = {
@@ -573,10 +574,15 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       },
     });
 
-    for (const [key, value] of Object.entries(response.headers)) {
+    const proxied =
+      resource.type === "http_api"
+        ? rewriteProxiedHttpResponse(response.body, response.headers, resource.id)
+        : { body: response.body, headers: response.headers };
+
+    for (const [key, value] of Object.entries(proxied.headers)) {
       reply.header(key, value);
     }
-    return reply.code(response.statusCode).send(response.body);
+    return reply.code(response.statusCode).send(proxied.body);
   };
 
   app.all<{ Params: { resourceId: string } }>("/r/:resourceId", proxyResource);
