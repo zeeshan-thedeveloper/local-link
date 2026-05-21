@@ -72,6 +72,7 @@ program
     const config = existingConfig ?? createDefaultConfig(gatewayUrl);
     config.gatewayUrl = host.gatewayUrl ?? gatewayUrl;
     const existing = config.resources.find((resource) => resource.id === host.resourceId);
+    const dashboardConfig = normalizeGatewayResourceConfig(host.type, host.config, host.name);
     const resourceConfig = await resolveResourceConfig(host, existing);
 
     config.resources = [
@@ -86,6 +87,12 @@ program
     ];
     await saveConfig(config);
     process.stdout.write(`Saved config for '${host.name}'.\n`);
+
+    if (dashboardConfig) {
+      process.stdout.write("Starting tunnel using dashboard configuration.\n");
+      runDaemonDashboard(config);
+      return;
+    }
 
     const shouldStart = await confirm({ message: "Start the tunnel now?", default: true });
     if (shouldStart) {
@@ -166,7 +173,7 @@ type HostLookup = {
   resourceId: string;
   name: string;
   type: HostResourceConfig["type"];
-  config?: HostResourceConfig["config"];
+  config?: unknown;
   gatewayUrl?: string;
 };
 
