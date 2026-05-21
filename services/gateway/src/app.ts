@@ -518,20 +518,34 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     reply: FastifyReply,
   ) => {
     const started = Date.now();
-    const apiKeyValue = extractApiKey(request);
-    if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
-
-    const apiKey = await prisma.apiKey.findUnique({
-      where: { keyHash: hashApiKey(apiKeyValue) },
-    });
-    if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
-      return reply.code(403).send({ error: "Invalid API key" });
-    }
-
     const resource = await prisma.resource.findUnique({
       where: { id: request.params.resourceId },
     });
     if (!resource || !resource.active) return reply.code(404).send({ error: "Resource not found" });
+
+    const publicWebsite = isPublicHttpResource(resource);
+    const apiKeyValue = extractApiKey(request);
+    let apiKeyId: string | null = null;
+
+    if (!publicWebsite) {
+      if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { keyHash: hashApiKey(apiKeyValue) },
+      });
+      if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
+        return reply.code(403).send({ error: "Invalid API key" });
+      }
+      apiKeyId = apiKey.id;
+      await prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } });
+    } else if (apiKeyValue) {
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { keyHash: hashApiKey(apiKeyValue) },
+      });
+      if (apiKey && (!apiKey.resourceId || apiKey.resourceId === request.params.resourceId)) {
+        apiKeyId = apiKey.id;
+        await prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } });
+      }
+    }
 
     const targetPath = buildProxyTargetPath(request);
     const response = await tunnel.send(resource.hostId, {
@@ -548,19 +562,16 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
             : null,
     });
 
-    await Promise.all([
-      prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } }),
-      prisma.requestLog.create({
-        data: {
-          resourceId: resource.id,
-          apiKeyId: apiKey.id,
-          method: request.method,
-          path: targetPath,
-          statusCode: response.statusCode,
-          durationMs: Date.now() - started,
-        },
-      }),
-    ]);
+    await prisma.requestLog.create({
+      data: {
+        resourceId: resource.id,
+        apiKeyId,
+        method: request.method,
+        path: targetPath,
+        statusCode: response.statusCode,
+        durationMs: Date.now() - started,
+      },
+    });
 
     for (const [key, value] of Object.entries(response.headers)) {
       reply.header(key, value);
@@ -582,6 +593,12 @@ function buildProxyTargetPath(
   if (suffix === undefined) return `/${query}`;
   const path = suffix ? `/${suffix}` : "/";
   return `${path}${query}`;
+}
+
+function isPublicHttpResource(resource: { type: string; config: unknown }) {
+  if (resource.type !== "http_api") return false;
+  if (!resource.config || typeof resource.config !== "object") return false;
+  return (resource.config as { publicAccess?: boolean }).publicAccess === true;
 }
 
 function extractApiKey(request: FastifyRequest) {

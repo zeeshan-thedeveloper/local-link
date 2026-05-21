@@ -32,13 +32,14 @@ export function AddResourceSlideOver({
   const [type, setType] = useState<ResourceType>("database");
   const [name, setName] = useState("");
   const [localUrl, setLocalUrl] = useState("");
+  const [publicAccess, setPublicAccess] = useState(true);
   const [connectionString, setConnectionString] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const types: Array<{ id: ResourceType; name: string; desc: string }> = [
     { id: "database", name: "Database", desc: "Postgres query endpoint" },
-    { id: "http-api", name: "HTTP API", desc: "Any local web service" },
+    { id: "http-api", name: "Local website", desc: "Localhost app reachable via gateway URL" },
   ];
 
   const submit = () => {
@@ -54,7 +55,10 @@ export function AddResourceSlideOver({
                   localUrl ||
                   "postgresql://locallink:locallink@localhost:5433/locallink",
               }
-            : { url: localUrl || "http://localhost:3000" };
+            : {
+                url: localUrl || "http://localhost:3000",
+                publicAccess,
+              };
         const response = await fetch(`${gatewayUrl}/resources`, {
           method: "POST",
           credentials: "include",
@@ -138,6 +142,28 @@ export function AddResourceSlideOver({
               You can update this later with the host CLI setup wizard.
             </div>
           </div>
+          {type === "http-api" && (
+            <div className="field">
+              <label
+                style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={publicAccess}
+                  onChange={(event) => setPublicAccess(event.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong>Public gateway URL</strong> — open in a browser without an API key
+                </span>
+              </label>
+              <div className="field-help">
+                Host token (<span className="mono">lhk_…</span>) is only for{" "}
+                <span className="mono">locallink setup</span>. API keys stay optional for
+                programmatic access.
+              </div>
+            </div>
+          )}
           {type === "database" && (
             <div className="field">
               <div className="field-label">

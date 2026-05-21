@@ -26,7 +26,7 @@ export default function ResourcesPage() {
   const types: Array<{ id: Filter; label: string }> = [
     { id: "all", label: "All" },
     { id: "database", label: "Databases" },
-    { id: "http-api", label: "HTTP APIs" },
+    { id: "http-api", label: "Local websites" },
   ];
   const items = useMemo(() => {
     const filteredByType =
@@ -206,7 +206,7 @@ export default function ResourcesPage() {
             <div className="sub">
               {populated
                 ? "Try a different filter or search term."
-                : "Add a Postgres database or HTTP service to start routing requests through the gateway."}
+                : "Add a Postgres database or local website to start routing through the gateway."}
             </div>
             {!populated && (
               <button className="btn btn-primary" onClick={openAddResource}>
