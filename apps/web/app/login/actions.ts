@@ -20,12 +20,13 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   });
   if (!response.ok) return { ok: false, error: "credentials" };
 
-  const token = getSessionToken(response.headers);
-  if (!token) return { ok: false, error: "session" };
-
   const body = (await response.json()) as {
     user?: { id: string; email: string; name?: string | null };
+    token?: string;
   };
+
+  const token = body.token ?? getSessionToken(response.headers);
+  if (!token) return { ok: false, error: "session" };
 
   const cookieStore = await cookies();
   cookieStore.set("locallink_session", token, {

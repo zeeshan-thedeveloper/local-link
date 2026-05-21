@@ -12,7 +12,8 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 const CurrentUserContext = createContext<CurrentUser | null>(null);
-const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
+const gatewayUrl =
+  process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 const currentUserUpdatedEvent = "locallink:current-user-updated";
 
 export function useCurrentUser() {
@@ -31,21 +32,34 @@ function crumbsForPath(pathname: string) {
   return ["LocalLink", "Dashboard"];
 }
 
-export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: CurrentUser | null }) {
+export function AppShell({
+  children,
+  currentUser,
+}: {
+  children: React.ReactNode;
+  currentUser: CurrentUser | null;
+}) {
   const pathname = usePathname();
   const [user, setUser] = useState(currentUser);
   const [addOpen, setAddOpen] = useState(false);
-  const [keyContext, setKeyContext] = useState<{ resourceId: string; onCreated?: () => void } | null>(null);
+  const [keyContext, setKeyContext] = useState<{
+    resourceId: string;
+    onCreated?: () => void;
+  } | null>(null);
   const [connectHost, setConnectHost] = useState<{
     resource: { id: string; name: string; type: ResourceType };
     token: string;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [connectedHostCount, setConnectedHostCount] = useState(0);
-  const overlayValue = useMemo(() => ({
-    openAddResource: () => setAddOpen(true),
-    openGenerateKey: (resourceId: string, onCreated?: () => void) => setKeyContext({ resourceId, onCreated }),
-  }), []);
+  const overlayValue = useMemo(
+    () => ({
+      openAddResource: () => setAddOpen(true),
+      openGenerateKey: (resourceId: string, onCreated?: () => void) =>
+        setKeyContext({ resourceId, onCreated }),
+    }),
+    [],
+  );
 
   useEffect(() => {
     setUser(currentUser);
@@ -59,6 +73,27 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     window.addEventListener(currentUserUpdatedEvent, onUserUpdated);
     return () => window.removeEventListener(currentUserUpdatedEvent, onUserUpdated);
   }, []);
+
+  useEffect(() => {
+    if (user || pathname === "/" || pathname.startsWith("/login")) return;
+
+    let cancelled = false;
+    const hydrateUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!response.ok || cancelled) return;
+        const data = (await response.json()) as { user?: CurrentUser | null };
+        if (!cancelled && data.user) setUser(data.user);
+      } catch {
+        // keep server-provided user state
+      }
+    };
+
+    void hydrateUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, user]);
 
   useEffect(() => {
     if (pathname === "/" || pathname.startsWith("/login")) return;
@@ -116,9 +151,9 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               resource: {
                 id: created.resource.id,
                 name: created.resource.name,
-                type: created.resource.type
+                type: created.resource.type,
               },
-              token: created.hostToken
+              token: created.hostToken,
             });
             showToast("Resource created");
           }}
@@ -134,11 +169,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           open={Boolean(keyContext)}
           resourceId={keyContext?.resourceId ?? null}
           onClose={() => setKeyContext(null)}
-          onCreated={() => { keyContext?.onCreated?.(); showToast("API key created"); }}
+          onCreated={() => {
+            keyContext?.onCreated?.();
+            showToast("API key created");
+          }}
           gatewayUrl={gatewayUrl}
         />
         <div className="toast-root">
-          {toast && <div className="toast"><span className="dot"/>{toast}</div>}
+          {toast && (
+            <div className="toast">
+              <span className="dot" />
+              {toast}
+            </div>
+          )}
         </div>
       </OverlayContextProvider>
     </CurrentUserContext.Provider>

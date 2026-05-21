@@ -4,9 +4,11 @@ import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { getCurrentUser } from "@/lib/gateway";
 import "./globals.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "LocalLink",
-  description: "Personal API gateway for local resources"
+  description: "Personal API gateway for local resources",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -15,14 +17,18 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function() {
             try {
               var t = localStorage.getItem('ll-theme') || 'dark';
               document.documentElement.setAttribute('data-theme', t);
             } catch (e) {}
           })();
-        `}} />
+        `,
+          }}
+        />
         <ThemeProvider>
           <AppShell currentUser={currentUser}>{children}</AppShell>
         </ThemeProvider>
