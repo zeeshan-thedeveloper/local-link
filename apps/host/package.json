@@ -6,7 +6,8 @@
     "locallink": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "package.json"
   ],
   "engines": {
     "node": ">=18"

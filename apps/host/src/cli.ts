@@ -3,14 +3,12 @@ import { confirm, input, password } from "@inquirer/prompts";
 import { Command } from "commander";
 import { createDefaultConfig, loadConfig, saveConfig, type HostResourceConfig } from "./config.js";
 import { startDaemon, type DaemonEvent } from "./daemon.js";
-import {
-  describeResourceConfig,
-  normalizeGatewayResourceConfig,
-} from "./resource-config.js";
+import { describeResourceConfig, normalizeGatewayResourceConfig } from "./resource-config.js";
+import { CLI_VERSION } from "./version.js";
 
 const program = new Command();
 
-program.name("locallink").description("LocalLink host daemon").version("0.1.0");
+program.name("locallink").description("LocalLink host daemon").version(CLI_VERSION);
 
 program
   .command("init")
@@ -197,9 +195,7 @@ async function resolveResourceConfig(
 ): Promise<HostResourceConfig["config"]> {
   const fromGateway = normalizeGatewayResourceConfig(host.type, host.config, host.name);
   if (fromGateway) {
-    process.stdout.write(
-      `Using dashboard config (${describeResourceConfig(fromGateway)}).\n`,
-    );
+    process.stdout.write(`Using dashboard config (${describeResourceConfig(fromGateway)}).\n`);
     return fromGateway;
   }
 
@@ -333,7 +329,7 @@ function runDaemonDashboard(config: Awaited<ReturnType<typeof loadConfig>>) {
     const line = "─".repeat(w);
     process.stdout.write("\x1bc");
     process.stdout.write(
-      `${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v0.3.0${C.reset}  ${C.gray}→ ${config.gatewayUrl}${C.reset}\n`,
+      `${C.bold}${C.cyan}  LocalLink${C.reset}  ${C.dim}v${CLI_VERSION}${C.reset}  ${C.gray}→ ${config.gatewayUrl}${C.reset}\n`,
     );
     process.stdout.write(`${C.dim}  ${line}${C.reset}\n`);
     process.stdout.write(`${C.bold}  Tunnels${C.reset}\n`);

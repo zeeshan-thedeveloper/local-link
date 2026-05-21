@@ -1,4 +1,8 @@
-import type { TunnelRequestPayload, TunnelResponsePayload } from "@locallink/shared";
+import {
+  TUNNEL_MAX_HTTP_BUFFER_SIZE,
+  type TunnelRequestPayload,
+  type TunnelResponsePayload,
+} from "@locallink/shared";
 import type { PrismaClient } from "@prisma/client";
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
@@ -15,15 +19,19 @@ export class TunnelBroker {
   private readonly socketsByHost = new Map<string, { socketId: string; lastSeen: string | null }>();
   private readonly pending = new Map<string, PendingRequest>();
 
-  constructor(server: HttpServer, private readonly prisma: PrismaClient) {
+  constructor(
+    server: HttpServer,
+    private readonly prisma: PrismaClient,
+  ) {
     this.io = new Server(server, {
-      cors: { origin: true, credentials: true }
+      cors: { origin: true, credentials: true },
+      maxHttpBufferSize: TUNNEL_MAX_HTTP_BUFFER_SIZE,
     });
     this.io.on("connection", async (socket) => {
       const token = String(socket.handshake.auth.token ?? "");
       const resource = token
         ? await this.prisma.resource.findFirst({
-            where: { tokenHash: hashApiKey(token), active: true }
+            where: { tokenHash: hashApiKey(token), active: true },
           })
         : null;
 

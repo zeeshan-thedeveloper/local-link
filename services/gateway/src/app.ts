@@ -549,19 +549,26 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }
 
     const targetPath = buildProxyTargetPath(request);
-    const response = await tunnel.send(resource.hostId, {
-      requestId: randomUUID(),
-      resourceId: resource.id,
-      method: request.method,
-      path: targetPath,
-      headers: normalizeProxyRequestHeaders(request.headers),
-      body:
-        typeof request.body === "string"
-          ? request.body
-          : request.body
-            ? JSON.stringify(request.body)
-            : null,
-    });
+    let response;
+    try {
+      response = await tunnel.send(resource.id, {
+        requestId: randomUUID(),
+        resourceId: resource.id,
+        method: request.method,
+        path: targetPath,
+        headers: normalizeProxyRequestHeaders(request.headers),
+        body:
+          typeof request.body === "string"
+            ? request.body
+            : request.body
+              ? JSON.stringify(request.body)
+              : null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Tunnel request failed";
+      const statusCode = message.includes("not connected") ? 503 : 504;
+      return reply.code(statusCode).send({ error: message });
+    }
 
     await prisma.requestLog.create({
       data: {
