@@ -1,6 +1,6 @@
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 node_modules
 dist
 .next
@@ -26,5 +26,30 @@ tasks/
 .actrc
 .npmrc
 
-# IDE config
+# IDE and AI assistant config
 .cursor/
+.claude/
+.codex/
+
+# Private keys, certs, DB dumps
+*.pem
+*.key
+*.p12
+*firebase-adminsdk*.json
+service-account*.json
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql
+*.bak
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Local planning / agent work files
+.planning/
+STATUS.md
+PLAN.md
+TASKS.md
