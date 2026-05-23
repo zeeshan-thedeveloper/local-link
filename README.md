@@ -56,7 +56,6 @@ packages/
 examples/
   local-db/     Express API that queries a tunneled Postgres resource via @locallink/client
   http/         Vite React app for end-to-end HTTP proxy testing
-desing/         Static HTML/CSS/JSX mockups used during UI design iteration
 ```
 
 ---
