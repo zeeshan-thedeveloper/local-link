@@ -18,3 +18,13 @@ PUBLISHING.md
 
 # Local task files — agent work notes, not committed
 tasks/
+
+# Local CI secrets (copy of .secrets.example with real values)
+.secrets
+
+# Local act runner config and npm registry config
+.actrc
+.npmrc
+
+# IDE config
+.cursor/
