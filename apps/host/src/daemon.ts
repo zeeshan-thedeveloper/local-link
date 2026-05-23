@@ -1,4 +1,3 @@
-import { TUNNEL_MAX_HTTP_BUFFER_SIZE } from "@locallink/shared";
 import { io, type Socket } from "socket.io-client";
 import type { HostConfig, HostResourceConfig } from "./config.js";
 import { proxyRequest } from "./proxy.js";
@@ -48,7 +47,6 @@ function startResourceDaemon(
   const socket = io(gatewayUrl, {
     auth: { token: resource.token },
     transports: ["websocket"],
-    maxHttpBufferSize: TUNNEL_MAX_HTTP_BUFFER_SIZE,
   });
 
   socket.on("connect", () => {
