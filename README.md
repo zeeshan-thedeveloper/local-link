@@ -1,17 +1,11 @@
 # Local-Link
 
-A self-hosted API gateway that exposes local resources — Postgres databases, HTTP services — through a persistent Socket.IO tunnel, without port forwarding or sharing upstream credentials.
+A self-hosted API gateway that exposes local resources — Postgres databases, HTTP services (ai models yet to be added in support) — through a persistent Socket.IO tunnel, without port forwarding or sharing upstream credentials.
 
-> **Portfolio note.** Local-Link is a portfolio migration of an older Local Database Hosting prototype. It is not production-ready software. It demonstrates the architectural pattern of a central gateway + outbound-only host daemon for controlled local resource access.
-
-<p align="center">
-  <img src="docs/assets/local-link-dashboard.png" alt="Local-Link dashboard showing resources, API keys, tunnel status, and request logs" width="900" />
-</p>
 
 <p align="center">
-  <em>Local-Link dashboard: manage local resources, scoped API keys, active tunnels, and request logs.</em>
+ <img width="1918" height="980" alt="image" src="https://github.com/user-attachments/assets/2c391e4b-2d72-44de-8f9b-51b34b37af1a" />
 </p>
-
 ---
 
 ## Problem
@@ -28,18 +22,20 @@ Local-Link takes a different approach: the host machine opens an outbound WebSoc
 
 ## Product flow
 
-```
-Client request
-      │
-      ▼
-┌─────────────┐   scoped API key   ┌──────────────┐   Socket.IO tunnel   ┌───────────────┐
-│   Gateway   │ ─────────────────► │  Host daemon │ ───────────────────► │ Local resource│
-│  (Fastify)  │ ◄───────────────── │  (locallink) │ ◄─────────────────── │ (Postgres/HTTP│
-└─────────────┘   proxied response └──────────────┘                      └───────────────┘
-       │
-       ▼
-  Next.js dashboard
-  (manage resources + API keys)
+```mermaid
+flowchart LR
+    Client([Client request])
+    GW["Gateway\n(Fastify)"]
+    HD["Host daemon\n(locallink)"]
+    LR["Local resource\n(Postgres / HTTP)"]
+    DB["Next.js dashboard\n(resources · keys · logs)"]
+
+    Client --> GW
+    GW -->|scoped API key| HD
+    HD -->|proxied response| GW
+    HD -->|Socket.IO tunnel| LR
+    LR -->|response| HD
+    GW --> DB
 ```
 
 1. The **host daemon** (`locallink`) runs on the developer's machine. It opens an outbound tunnel to the gateway and registers local resources (a Postgres port, an HTTP service, etc.).
@@ -68,18 +64,6 @@ examples/
 
 ---
 
-## Screenshots
-
-> Add/update these screenshots before final publication if the files are not present yet.
-
-| View               | Purpose                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| Dashboard overview | Shows resources, API keys, tunnel status, and request logs |
-| Resource setup     | Shows how a local HTTP/Postgres resource is registered     |
-| API key management | Shows scoped API key creation/revocation                   |
-| Request logs       | Shows proxied request status, latency, and method/path     |
-
----
 
 ## Key features
 
