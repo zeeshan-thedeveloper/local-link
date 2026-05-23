@@ -4,6 +4,14 @@ A self-hosted API gateway that exposes local resources — Postgres databases, H
 
 > **Portfolio note.** Local-Link is a portfolio migration of an older Local Database Hosting prototype. It is not production-ready software. It demonstrates the architectural pattern of a central gateway + outbound-only host daemon for controlled local resource access.
 
+<p align="center">
+  <img src="docs/assets/local-link-dashboard.png" alt="Local-Link dashboard showing resources, API keys, tunnel status, and request logs" width="900" />
+</p>
+
+<p align="center">
+  <em>Local-Link dashboard: manage local resources, scoped API keys, active tunnels, and request logs.</em>
+</p>
+
 ---
 
 ## Problem
@@ -60,15 +68,40 @@ examples/
 
 ---
 
+## Screenshots
+
+> Add/update these screenshots before final publication if the files are not present yet.
+
+| View               | Purpose                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| Dashboard overview | Shows resources, API keys, tunnel status, and request logs |
+| Resource setup     | Shows how a local HTTP/Postgres resource is registered     |
+| API key management | Shows scoped API key creation/revocation                   |
+| Request logs       | Shows proxied request status, latency, and method/path     |
+
+---
+
 ## Key features
 
 - **Outbound-only tunnel** — host opens a Socket.IO connection to the gateway; no inbound ports required.
 - **Scoped API keys** — keys are bound to a specific resource; revocation propagates to the host agent in milliseconds.
-- **Postgres proxy** — the gateway parses the tunnel stream and forwards queries over `node-postgres`; the client never sees the database credentials.
+- **Postgres proxy** — the gateway forwards queries over `node-postgres`; the client never sees database credentials.
 - **HTTP proxy** — arbitrary HTTP services can be tunnelled; the gateway rewrites asset paths for local web UIs.
 - **Better Auth** — OAuth (Google, GitHub) + email/password auth with email verification via Resend.
 - **Per-request logs** — every proxied request is recorded: timestamp, method, path, status, latency, API key ID.
 - **OpenTelemetry** — optional OTLP trace export from the gateway.
+
+---
+
+## Why this project matters
+
+Local-Link demonstrates backend and platform engineering beyond CRUD:
+
+- Persistent WebSocket tunnel design for outbound-only host connectivity.
+- Scoped API-key access to private local resources without exposing upstream credentials.
+- Three-tier architecture: CLI daemon + central gateway + web dashboard.
+- Postgres and HTTP proxying with credential isolation at the gateway boundary.
+- Explicit security tradeoff documentation distinguishing prototype from production requirements.
 
 ---
 

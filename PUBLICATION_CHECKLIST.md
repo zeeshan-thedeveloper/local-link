@@ -25,10 +25,13 @@ Use this before making the repository public.
 
 ## 2. Screenshot / public asset review
 
-**Status: PASS**
+**Status: PLACEHOLDER ADDED — MANUAL IMAGE PENDING**
 
 - `apps/web/public/` contains only `.gitkeep`. No screenshots, no images, no files.
-- `desing/` (tracked design mockups) contains only placeholder/mock data — no real emails, tokens, client names, or credentials found.
+- `desing/` folder removed from git tracking in a previous session and added to `.gitignore`.
+- `docs/assets/` folder created with `.gitkeep` for future screenshot placement.
+- `docs/assets/local-link-dashboard.png` — **not yet present**. Hero image placeholder added to README. Add a real screenshot before final public polish.
+- Screenshots section added to README with a table describing 4 views (dashboard, resource setup, API key management, request logs) — no image files required to render the table, but adding real PNGs will improve the portfolio presentation significantly.
 
 ---
 
@@ -53,6 +56,10 @@ Use this before making the repository public.
 - No "QueryGate" references in any tracked file.
 - No "accesslayer" or "Local Database Hosting" references in any tracked file.
 - Historical context note added to README: _"Local-Link is a portfolio migration of an older Local Database Hosting prototype."_
+- `desing/` reference removed from README architecture block (folder removed from tracking entirely).
+- "Why this project matters" section added.
+- Screenshots section added.
+- Hero image placeholder added (manual image still pending — see section 2).
 
 ---
 
@@ -127,8 +134,8 @@ These items could not be verified automatically and require human review:
 
 | Item                                            | Notes                                                                                                                       |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `desing/` HTML/JSX mockups                      | Contain product UI wireframes. No credentials found by scan, but review visually if any screenshots embed real data.        |
-| `DEPLOYMENT.md`                                 | Review for any real hostnames, IPs, or account-specific URLs before making public.                                          |
+| `desing/` HTML/JSX mockups                      | Removed from git tracking. Folder still exists locally but is gitignored. No action needed.                                 |
+| `DEPLOYMENT.md`                                 | **Sanitized** — real IP (`134.x.x.x`) replaced with `YOUR_SERVER_IP`; personal deploy username replaced with `deploy`.      |
 | GitHub Actions workflows (`.github/workflows/`) | Review for any hardcoded tokens or environment-specific secrets. All secrets should reference `${{ secrets.* }}` variables. |
 | npm publish config                              | If publishing packages, ensure `NPM_TOKEN` is only in GitHub Secrets, not in any tracked file.                              |
 
@@ -142,11 +149,16 @@ These items could not be verified automatically and require human review:
 
 - [ ] Rotate all credentials used during local development (see section 1).
 - [ ] Confirm `main` is set as default branch in GitHub Settings (see section 8).
-- [ ] Review `DEPLOYMENT.md` for any real hostnames or IPs (see section 9).
+- [x] Sanitize `DEPLOYMENT.md` — real IP and personal username replaced with placeholders.
 - [ ] Review `.github/workflows/` to ensure no hardcoded tokens.
 
-### Optional / recommended
+### Recommended before going public
+
+- [ ] Add `docs/assets/local-link-dashboard.png` — a real screenshot of the running dashboard (see section 2).
+- [ ] Add remaining screenshots (resource setup, API keys, request logs) to `docs/assets/` and update the Screenshots table in README.
+
+### Optional
 
 - [ ] Add a `CONTRIBUTING.md` if you want external contributions.
 - [ ] Add GitHub repository topics: `portfolio`, `api-gateway`, `typescript`, `socket-io`, `self-hosted`.
-- [ ] Pin the `README.md` as the social preview in GitHub Settings → Social preview.
+- [ ] Set a social preview image in GitHub Settings → Social preview.

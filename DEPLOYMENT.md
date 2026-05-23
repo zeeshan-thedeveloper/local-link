@@ -9,9 +9,9 @@
   - `~/apps/locallink/.env` for production
   - `~/apps/locallink/.env.staging` for staging
 - GitHub Actions secrets (either naming works):
-  - Host: `DROPLET_IP` or `DEPLOY_HOST` (your droplet IP, e.g. `134.209.221.190`)
+  - Host: `DROPLET_IP` or `DEPLOY_HOST` (your droplet IP, e.g. `YOUR_SERVER_IP`)
   - SSH key: `SSH_PRIVATE_KEY` or `DEPLOY_KEY` (private key from `~/.ssh/id_ed25519` on your PC)
-  - User: `DEPLOY_USER` (optional; defaults to `zeesh`)
+  - User: `DEPLOY_USER` (optional; defaults to `deploy`)
   - `DATABASE_URL`
   - `JWT_SECRET`
   - `GOOGLE_CLIENT_ID`
@@ -28,12 +28,12 @@ The **Release** workflow (`.github/workflows/release.yml`) publishes the CLI usi
 
 On [npmjs.com](https://www.npmjs.com/), open **@locallink/cli → Settings → Trusted publishing** and add:
 
-| Field | Value |
-|--------|--------|
-| Provider | GitHub Actions |
-| Repository | `zeeshan-thedeveloper/local-link` |
-| Workflow filename | `release.yml` |
-| Environment | (leave empty) |
+| Field             | Value                             |
+| ----------------- | --------------------------------- |
+| Provider          | GitHub Actions                    |
+| Repository        | `zeeshan-thedeveloper/local-link` |
+| Workflow filename | `release.yml`                     |
+| Environment       | (leave empty)                     |
 
 After merging changesets version PRs, push to `main` or run **Actions → Release → Run workflow**. Verify with:
 
