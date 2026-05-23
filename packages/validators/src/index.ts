@@ -9,6 +9,16 @@ export const httpResourceConfigSchema = z.object({
   headers: z.record(z.string()).optional(),
 });
 
+export const webAppResourceConfigSchema = z.object({
+  url: z.string().url(),
+});
+
+export const apiResourceConfigSchema = z.object({
+  url: z.string().url(),
+  publicAccess: z.boolean().optional(),
+  headers: z.record(z.string()).optional(),
+});
+
 export const databaseResourceConfigSchema = z
   .object({
     engine: z.enum(["postgres", "sqlite"]),
@@ -28,18 +38,50 @@ export const aiModelResourceConfigSchema = z.object({
 export const resourceRegistrationSchema = z.discriminatedUnion("type", [
   z.object({
     name: z.string().min(1).max(120),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
     type: z.literal("http-api"),
     hostId: z.string().min(1),
     config: httpResourceConfigSchema,
   }),
   z.object({
     name: z.string().min(1).max(120),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
+    type: z.literal("web-app"),
+    hostId: z.string().min(1),
+    config: webAppResourceConfigSchema,
+  }),
+  z.object({
+    name: z.string().min(1).max(120),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
+    type: z.literal("api"),
+    hostId: z.string().min(1),
+    config: apiResourceConfigSchema,
+  }),
+  z.object({
+    name: z.string().min(1).max(120),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
     type: z.literal("database"),
     hostId: z.string().min(1),
     config: databaseResourceConfigSchema,
   }),
   z.object({
     name: z.string().min(1).max(120),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional(),
     type: z.literal("ai-model"),
     hostId: z.string().min(1),
     config: aiModelResourceConfigSchema,
@@ -48,9 +90,19 @@ export const resourceRegistrationSchema = z.discriminatedUnion("type", [
 
 export const resourceUpdateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .optional(),
   active: z.boolean().optional(),
   config: z
-    .union([httpResourceConfigSchema, databaseResourceConfigSchema, aiModelResourceConfigSchema])
+    .union([
+      httpResourceConfigSchema,
+      webAppResourceConfigSchema,
+      apiResourceConfigSchema,
+      databaseResourceConfigSchema,
+      aiModelResourceConfigSchema,
+    ])
     .optional(),
 });
 

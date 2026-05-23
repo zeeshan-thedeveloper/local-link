@@ -46,7 +46,10 @@ function createPrismaMock() {
     resource: {
       findMany: vi.fn(() => state.resources),
       findUnique: vi.fn(
-        ({ where }) => state.resources.find((resource) => resource.id === where.id) ?? null,
+        ({ where }) =>
+          state.resources.find(
+            (resource) => resource.id === where.id || resource.slug === where.slug,
+          ) ?? null,
       ),
       create: vi.fn(({ data }) => {
         const resource = { id: "res_1", active: true, createdAt: new Date(), ...data };
@@ -200,6 +203,7 @@ describe("gateway app", () => {
       },
     });
     expect(create.statusCode).toBe(201);
+    expect(create.json().resource).toMatchObject({ slug: "local-api" });
     const patch = await app.inject({
       method: "PATCH",
       url: "/resources/res_1",
@@ -277,6 +281,75 @@ describe("gateway app", () => {
     expect(response.body).toBe("<html>ok</html>");
     expect(send).toHaveBeenCalled();
     await app.close();
+  });
+
+  it("proxies web apps through subdomain routing without rewriting", async () => {
+    process.env.GATEWAY_BASE_DOMAIN = "locallink.lvh.me:3001";
+    const send = vi.fn().mockResolvedValue({
+      statusCode: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+      body: '<script type="module" src="/src/main.tsx"></script>',
+    });
+    prisma.state.resources.push({
+      id: "res_web",
+      name: "Vite app",
+      slug: "vite-app",
+      type: "web_app",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:25543" },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/src/main.tsx?x=1",
+      headers: { host: "vite-app.locallink.lvh.me:3001" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('src="/src/main.tsx"');
+    expect(send).toHaveBeenCalledWith(
+      "res_web",
+      expect.objectContaining({ resourceId: "res_web", method: "GET", path: "/src/main.tsx?x=1" }),
+    );
+    await app.close();
+    delete process.env.GATEWAY_BASE_DOMAIN;
+  });
+
+  it("requires an API key for private api subdomains by default", async () => {
+    process.env.GATEWAY_BASE_DOMAIN = "locallink.lvh.me";
+    prisma.state.resources.push({
+      id: "res_api",
+      name: "Private API",
+      slug: "private-api",
+      type: "api",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:8080" },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { host: "private-api.locallink.lvh.me" },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "Missing API key" });
+    await app.close();
+    delete process.env.GATEWAY_BASE_DOMAIN;
   });
 
   it("rewrites root-absolute asset paths in proxied HTML", async () => {

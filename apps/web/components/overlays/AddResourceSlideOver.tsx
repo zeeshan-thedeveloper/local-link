@@ -32,14 +32,16 @@ export function AddResourceSlideOver({
   const [type, setType] = useState<ResourceType>("database");
   const [name, setName] = useState("");
   const [localUrl, setLocalUrl] = useState("");
-  const [publicAccess, setPublicAccess] = useState(true);
+  const [publicAccess, setPublicAccess] = useState(false);
   const [connectionString, setConnectionString] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const types: Array<{ id: ResourceType; name: string; desc: string }> = [
+    { id: "web-app", name: "Web App", desc: "Connect a React, Vite, or Next.js app" },
+    { id: "api", name: "API", desc: "Connect a Node.js, Express, or FastAPI backend" },
     { id: "database", name: "Database", desc: "Postgres query endpoint" },
-    { id: "http-api", name: "Local website", desc: "Localhost app reachable via gateway URL" },
+    { id: "ai-model", name: "AI Model", desc: "OpenAI-compatible local model endpoint" },
   ];
 
   const submit = () => {
@@ -55,10 +57,20 @@ export function AddResourceSlideOver({
                   localUrl ||
                   "postgresql://locallink:locallink@localhost:5433/locallink",
               }
-            : {
-                url: localUrl || "http://localhost:3000",
-                publicAccess,
-              };
+            : type === "ai-model"
+              ? {
+                  provider: "openai-compatible",
+                  baseUrl: localUrl || "http://localhost:3000",
+                  model: name || "local",
+                }
+              : type === "web-app"
+                ? {
+                    url: localUrl || "http://localhost:3000",
+                  }
+                : {
+                    url: localUrl || "http://localhost:3000",
+                    publicAccess,
+                  };
         const response = await fetch(`${gatewayUrl}/resources`, {
           method: "POST",
           credentials: "include",
@@ -142,7 +154,7 @@ export function AddResourceSlideOver({
               You can update this later with the host CLI setup wizard.
             </div>
           </div>
-          {type === "http-api" && (
+          {type === "api" && (
             <div className="field">
               <label
                 style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}

@@ -7,6 +7,7 @@ import { useOverlays } from "@/components/overlays/OverlayContext";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { KEYS, statusClass } from "@/lib/data";
+import { resourceEndpoint } from "@/lib/resource-url";
 import type { RequestLog, Resource, ResourceType } from "@/lib/types";
 import { displayNameFromEmail } from "@/lib/user";
 
@@ -63,7 +64,7 @@ export default function DashboardPage() {
     ])
       .then(
         ([resourceItems, logItems]: [
-          Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>,
+          Array<Resource & { type: ResourceType | "ai_model" | "http_api" | "web_app" }>,
           RequestLog[],
         ]) => {
           setResources(resourceItems.map(normalizeResource));
@@ -270,12 +271,14 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
       ? "ai-model"
       : resource.type === "http_api"
         ? "http-api"
-        : resource.type;
-  return {
+        : resource.type === "web_app"
+          ? "web-app"
+          : resource.type;
+  const normalized: Resource = {
     ...resource,
     type: type as ResourceType,
     subtype: resource.subtype ?? type,
-    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    endpoint: resource.endpoint ?? "",
     local: resource.local ?? "-",
     status: !resource.active
       ? "inactive"
@@ -286,4 +289,5 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
     lastActive: resource.lastActive ?? "Never",
     reqs24h: resource.reqs24h ?? 0,
   };
+  return { ...normalized, endpoint: resource.endpoint ?? resourceEndpoint(normalized, gatewayUrl) };
 }

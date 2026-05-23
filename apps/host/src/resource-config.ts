@@ -22,6 +22,24 @@ export function normalizeGatewayResourceConfig(
     };
   }
 
+  if (type === "web-app") {
+    const url = pickString(value.url);
+    if (!url) return null;
+    return { type: "web-app", url: trimTrailingSlash(url) };
+  }
+
+  if (type === "api") {
+    const url = pickString(value.url);
+    if (!url) return null;
+    const headers = pickHeaders(value.headers);
+    return {
+      type: "api",
+      url: trimTrailingSlash(url),
+      ...(typeof value.publicAccess === "boolean" ? { publicAccess: value.publicAccess } : {}),
+      ...(headers ? { headers } : {}),
+    };
+  }
+
   if (type === "database") {
     const connectionString = pickString(value.connectionString);
     const filePath = pickString(value.filePath);
@@ -44,6 +62,8 @@ export function normalizeGatewayResourceConfig(
 
 export function describeResourceConfig(config: HostResourceConfig["config"]) {
   if (config.type === "http-api") return config.url;
+  if (config.type === "web-app") return config.url;
+  if (config.type === "api") return config.url;
   if (config.type === "database") return config.connectionString ?? config.filePath ?? "database";
   return `${config.baseUrl} (${config.model})`;
 }

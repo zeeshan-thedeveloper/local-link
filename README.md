@@ -2,7 +2,6 @@
 
 A self-hosted API gateway that exposes local resources — Postgres databases, HTTP services (ai models yet to be added in support) — through a persistent Socket.IO tunnel, without port forwarding or sharing upstream credentials.
 
-
 <p align="center">
  <img width="1918" height="980" alt="image" src="https://github.com/user-attachments/assets/2c391e4b-2d72-44de-8f9b-51b34b37af1a" />
 </p>
@@ -63,7 +62,6 @@ examples/
 ```
 
 ---
-
 
 ## Key features
 
@@ -159,17 +157,19 @@ pnpm ci:local
 
 All secrets use placeholder values in `.env.example`. Copy and replace before running.
 
-| Variable                  | Description                                         |
-| ------------------------- | --------------------------------------------------- |
-| `DATABASE_URL`            | Postgres connection string                          |
-| `JWT_SECRET`              | Token signing secret                                |
-| `BETTER_AUTH_SECRET`      | Better Auth session secret                          |
-| `GOOGLE_CLIENT_ID/SECRET` | Google OAuth app credentials                        |
-| `GITHUB_CLIENT_ID/SECRET` | GitHub OAuth app credentials                        |
-| `RESEND_API_KEY`          | Transactional email (Resend)                        |
-| `GATEWAY_URL`             | Public URL of the gateway (used by the host daemon) |
-| `FRONTEND_BASE_URL`       | Dashboard origin (used for CORS + OAuth redirects)  |
-| `OTEL_*`                  | Optional OpenTelemetry export config                |
+| Variable                          | Description                                         |
+| --------------------------------- | --------------------------------------------------- |
+| `DATABASE_URL`                    | Postgres connection string                          |
+| `JWT_SECRET`                      | Token signing secret                                |
+| `BETTER_AUTH_SECRET`              | Better Auth session secret                          |
+| `GOOGLE_CLIENT_ID/SECRET`         | Google OAuth app credentials                        |
+| `GITHUB_CLIENT_ID/SECRET`         | GitHub OAuth app credentials                        |
+| `RESEND_API_KEY`                  | Transactional email (Resend)                        |
+| `GATEWAY_URL`                     | Public URL of the gateway (used by the host daemon) |
+| `GATEWAY_BASE_DOMAIN`             | Base domain for subdomain-routed web/API resources  |
+| `NEXT_PUBLIC_GATEWAY_BASE_DOMAIN` | Public base domain shown in the dashboard           |
+| `FRONTEND_BASE_URL`               | Dashboard origin (used for CORS + OAuth redirects)  |
+| `OTEL_*`                          | Optional OpenTelemetry export config                |
 
 ---
 

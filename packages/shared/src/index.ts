@@ -1,6 +1,6 @@
 export { TUNNEL_MAX_HTTP_BUFFER_SIZE } from "./tunnel.js";
 
-export const resourceTypes = ["database", "ai-model", "http-api"] as const;
+export const resourceTypes = ["database", "ai-model", "http-api", "web-app", "api"] as const;
 
 export type ResourceType = (typeof resourceTypes)[number];
 
@@ -8,6 +8,19 @@ export type HttpResourceConfig = {
   type: "http-api";
   url: string;
   /** When true, the gateway URL works in a browser without an API key. */
+  publicAccess?: boolean;
+  headers?: Record<string, string>;
+};
+
+export type WebAppResourceConfig = {
+  type: "web-app";
+  url: string;
+};
+
+export type ApiResourceConfig = {
+  type: "api";
+  url: string;
+  /** When true, the subdomain URL works in a browser without an API key. */
   publicAccess?: boolean;
   headers?: Record<string, string>;
 };
@@ -26,11 +39,17 @@ export type AiModelResourceConfig = {
   model: string;
 };
 
-export type ResourceConfig = HttpResourceConfig | DatabaseResourceConfig | AiModelResourceConfig;
+export type ResourceConfig =
+  | HttpResourceConfig
+  | DatabaseResourceConfig
+  | AiModelResourceConfig
+  | WebAppResourceConfig
+  | ApiResourceConfig;
 
 type ResourceBase = {
   id: string;
   name: string;
+  slug: string;
   hostId: string;
   active: boolean;
   createdAt: string;
@@ -48,6 +67,14 @@ export type Resource =
   | (ResourceBase & {
       type: "ai-model";
       config: AiModelResourceConfig;
+    })
+  | (ResourceBase & {
+      type: "web-app";
+      config: WebAppResourceConfig;
+    })
+  | (ResourceBase & {
+      type: "api";
+      config: ApiResourceConfig;
     });
 
 export type ApiKey = {
@@ -106,3 +133,11 @@ export type ConnectedHost = {
   connectedAt: string;
   lastSeen: string;
 };
+
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

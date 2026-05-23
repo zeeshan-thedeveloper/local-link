@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TypeBadge } from "@/components/ui/TypeBadge";
+import { resourceEndpoint } from "@/lib/resource-url";
 import type { Resource, ResourceType } from "@/lib/types";
 
 type Filter = "all" | ResourceType;
@@ -25,8 +26,11 @@ export default function ResourcesPage() {
   const populated = resources.length > 0;
   const types: Array<{ id: Filter; label: string }> = [
     { id: "all", label: "All" },
+    { id: "web-app", label: "Web apps" },
+    { id: "api", label: "APIs" },
     { id: "database", label: "Databases" },
-    { id: "http-api", label: "Local websites" },
+    { id: "ai-model", label: "AI models" },
+    { id: "http-api", label: "Legacy HTTP" },
   ];
   const items = useMemo(() => {
     const filteredByType =
@@ -48,7 +52,7 @@ export default function ResourcesPage() {
     const [resourceItems, status] = await Promise.all([
       fetch(`${gatewayUrl}/resources`, { credentials: "include" }).then((response) =>
         response.ok ? response.json() : [],
-      ) as Promise<Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>>,
+      ) as Promise<Array<Resource & { type: ResourceType | "ai_model" | "http_api" | "web_app" }>>,
       fetch(`${gatewayUrl}/tunnel/status`, { credentials: "include" }).then((response) =>
         response.ok ? response.json() : { hosts: [] },
       ) as Promise<{ hosts: HostStatus[] }>,
@@ -146,10 +150,9 @@ export default function ResourcesPage() {
                     <TypeBadge type={resource.type} />
                   </td>
                   <td>
-                    <span
-                      className="mono"
-                      style={{ fontSize: 12, color: "var(--text-2)" }}
-                    >{`${gatewayUrl}/r/${resource.id}`}</span>
+                    <span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>
+                      {resource.endpoint}
+                    </span>
                   </td>
                   <td>
                     <StatusPill
@@ -206,7 +209,7 @@ export default function ResourcesPage() {
             <div className="sub">
               {populated
                 ? "Try a different filter or search term."
-                : "Add a Postgres database or local website to start routing through the gateway."}
+                : "Add a web app, API, database, or AI model to start routing through the gateway."}
             </div>
             {!populated && (
               <button className="btn btn-primary" onClick={openAddResource}>
@@ -227,18 +230,21 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
       ? "ai-model"
       : resource.type === "http_api"
         ? "http-api"
-        : resource.type;
-  return {
+        : resource.type === "web_app"
+          ? "web-app"
+          : resource.type;
+  const normalized: Resource = {
     ...resource,
     type: type as ResourceType,
     subtype: resource.subtype ?? type,
-    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    endpoint: resource.endpoint ?? "",
     local: resource.local ?? "-",
     status: resource.active ? "active" : "inactive",
     keys: resource.keys ?? 0,
     lastActive: resource.lastActive ?? "Never",
     reqs24h: resource.reqs24h ?? 0,
   };
+  return { ...normalized, endpoint: resource.endpoint ?? resourceEndpoint(normalized, gatewayUrl) };
 }
 
 function formatDate(value?: string) {

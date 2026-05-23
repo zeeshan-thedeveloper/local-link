@@ -58,6 +58,19 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   });
   await app.register(healthRoutes, { prisma });
 
+  app.addHook("onRequest", async (request, reply) => {
+    const slug = extractSubdomainSlug(request.headers.host);
+    if (!slug) return;
+
+    const resource = await prisma.resource.findUnique({ where: { slug } });
+    if (!resource || !resource.active) {
+      await reply.code(404).send({ error: "Resource not found" });
+      return;
+    }
+
+    await proxyResolvedResource(resource, request, reply, buildSubdomainTargetPath(request));
+  });
+
   async function requireDashboardAuth(request: FastifyRequest, reply: FastifyReply) {
     try {
       await request.jwtVerify();
@@ -341,10 +354,15 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   app.post("/resources", { preHandler: requireDashboardAuth }, async (request, reply) => {
     const parsed = resourceRegistrationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const slug = parsed.data.slug ?? generateResourceSlug(parsed.data.name);
+    if (!slug) return reply.code(400).send({ error: "Resource slug is required" });
+    const existing = await prisma.resource.findUnique({ where: { slug } });
+    if (existing) return reply.code(409).send({ error: "Resource slug already exists" });
     const generated = createHostToken();
     const created = await prisma.resource.create({
       data: {
         name: parsed.data.name,
+        slug,
         type: toPrismaResourceType(parsed.data.type),
         config: parsed.data.config,
         hostId: parsed.data.hostId,
@@ -377,6 +395,12 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     async (request, reply) => {
       const parsed = resourceUpdateSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      if (parsed.data.slug) {
+        const existing = await prisma.resource.findUnique({ where: { slug: parsed.data.slug } });
+        if (existing && existing.id !== request.params.id) {
+          return reply.code(409).send({ error: "Resource slug already exists" });
+        }
+      }
       const resource = await prisma.resource.update({
         where: { id: request.params.id },
         data: parsed.data,
@@ -497,26 +521,39 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     return { hosts: tunnel.connectedHosts() };
   });
 
-  const proxyResource = async (
+  const proxyPathResource = async (
     request: FastifyRequest<{ Params: { resourceId: string; "*"?: string } }>,
     reply: FastifyReply,
   ) => {
-    const started = Date.now();
     const resource = await prisma.resource.findUnique({
       where: { id: request.params.resourceId },
     });
     if (!resource || !resource.active) return reply.code(404).send({ error: "Resource not found" });
 
-    const publicWebsite = isPublicHttpResource(resource);
+    return proxyResolvedResource(resource, request, reply, buildProxyTargetPath(request));
+  };
+
+  async function proxyResolvedResource(
+    resource: {
+      id: string;
+      type: string;
+      config: unknown;
+    },
+    request: FastifyRequest,
+    reply: FastifyReply,
+    targetPath: string,
+  ) {
+    const started = Date.now();
+    const apiKeyRequired = requiresApiKey(resource);
     const apiKeyValue = extractApiKey(request);
     let apiKeyId: string | null = null;
 
-    if (!publicWebsite) {
+    if (apiKeyRequired) {
       if (!apiKeyValue) return reply.code(401).send({ error: "Missing API key" });
       const apiKey = await prisma.apiKey.findUnique({
         where: { keyHash: hashApiKey(apiKeyValue) },
       });
-      if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== request.params.resourceId)) {
+      if (!apiKey || (apiKey.resourceId && apiKey.resourceId !== resource.id)) {
         return reply.code(403).send({ error: "Invalid API key" });
       }
       apiKeyId = apiKey.id;
@@ -525,13 +562,12 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       const apiKey = await prisma.apiKey.findUnique({
         where: { keyHash: hashApiKey(apiKeyValue) },
       });
-      if (apiKey && (!apiKey.resourceId || apiKey.resourceId === request.params.resourceId)) {
+      if (apiKey && (!apiKey.resourceId || apiKey.resourceId === resource.id)) {
         apiKeyId = apiKey.id;
         await prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsed: new Date() } });
       }
     }
 
-    const targetPath = buildProxyTargetPath(request);
     let response;
     try {
       response = await tunnel.send(resource.id, {
@@ -573,10 +609,10 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       reply.header(key, value);
     }
     return reply.code(response.statusCode).send(proxied.body);
-  };
+  }
 
-  app.all<{ Params: { resourceId: string } }>("/r/:resourceId", proxyResource);
-  app.all<{ Params: { resourceId: string; "*": string } }>("/r/:resourceId/*", proxyResource);
+  app.all<{ Params: { resourceId: string } }>("/r/:resourceId", proxyPathResource);
+  app.all<{ Params: { resourceId: string; "*": string } }>("/r/:resourceId/*", proxyPathResource);
 
   return app;
 }
@@ -589,6 +625,41 @@ function buildProxyTargetPath(
   if (suffix === undefined) return `/${query}`;
   const path = suffix ? `/${suffix}` : "/";
   return `${path}${query}`;
+}
+
+function buildSubdomainTargetPath(request: FastifyRequest) {
+  return request.url || "/";
+}
+
+function extractSubdomainSlug(hostHeader: string | string[] | undefined) {
+  const hostValue = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+  if (!hostValue) return null;
+  const baseDomain = (process.env.GATEWAY_BASE_DOMAIN ?? "").trim().toLowerCase();
+  if (!baseDomain) return null;
+
+  const host = hostValue.split(":")[0]?.toLowerCase();
+  const normalizedBase = baseDomain.split(":")[0]?.replace(/^\.+|\.+$/g, "");
+  if (!host || !normalizedBase || !host.endsWith(`.${normalizedBase}`)) return null;
+
+  const subdomain = host.slice(0, -`.${normalizedBase}`.length);
+  return subdomain.split(".").pop() || null;
+}
+
+function generateResourceSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function requiresApiKey(resource: { type: string; config: unknown }) {
+  if (resource.type === "web_app") return false;
+  if (resource.type === "api") {
+    if (!resource.config || typeof resource.config !== "object") return true;
+    return (resource.config as { publicAccess?: boolean }).publicAccess !== true;
+  }
+  return !isPublicHttpResource(resource);
 }
 
 function isPublicHttpResource(resource: { type: string; config: unknown }) {
@@ -621,21 +692,28 @@ function normalizeProxyRequestHeaders(headers: FastifyRequest["headers"]) {
   );
 }
 
-function toPrismaResourceType(type: "database" | "ai-model" | "http-api") {
+type PublicResourceType = "database" | "ai-model" | "http-api" | "web-app" | "api";
+type PrismaResourceType = "database" | "ai_model" | "http_api" | "web_app" | "api";
+
+function toPrismaResourceType(type: PublicResourceType): PrismaResourceType {
   if (type === "ai-model") return "ai_model";
   if (type === "http-api") return "http_api";
+  if (type === "web-app") return "web_app";
+  if (type === "api") return "api";
   return "database";
 }
 
-function fromPrismaResourceType(type: "database" | "ai_model" | "http_api") {
+function fromPrismaResourceType(type: PrismaResourceType): PublicResourceType {
   if (type === "ai_model") return "ai-model";
   if (type === "http_api") return "http-api";
+  if (type === "web_app") return "web-app";
+  if (type === "api") return "api";
   return "database";
 }
 
-function serializeResource<
-  T extends { tokenHash?: string | null; type: "database" | "ai_model" | "http_api" },
->(resource: T) {
+function serializeResource<T extends { tokenHash?: string | null; type: PrismaResourceType }>(
+  resource: T,
+) {
   const sanitized = { ...resource };
   delete sanitized.tokenHash;
   return { ...sanitized, type: fromPrismaResourceType(resource.type) };

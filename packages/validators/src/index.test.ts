@@ -26,6 +26,27 @@ describe("validators", () => {
     });
   });
 
+  it("accepts web-app and api resource registrations", () => {
+    expect(
+      resourceRegistrationSchema.parse({
+        name: "Vite app",
+        slug: "vite-app",
+        type: "web-app",
+        hostId: "laptop",
+        config: { url: "http://localhost:5173" },
+      }),
+    ).toMatchObject({ type: "web-app", slug: "vite-app" });
+
+    expect(
+      resourceRegistrationSchema.parse({
+        name: "Backend",
+        type: "api",
+        hostId: "laptop",
+        config: { url: "http://localhost:8080", publicAccess: false },
+      }),
+    ).toMatchObject({ type: "api", config: { publicAccess: false } });
+  });
+
   it("requires database connection details", () => {
     expect(() =>
       resourceRegistrationSchema.parse({
