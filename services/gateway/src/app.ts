@@ -49,7 +49,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     },
     genReqId: () => randomUUID(),
   });
-  const oauthCallbackUserCounts = new WeakMap<FastifyRequest, number>();
+  const oauthCallbackTimestamps = new WeakMap<FastifyRequest, Date>();
   await app.register(cors, { origin: true, credentials: true });
   await app.register(cookie);
   await app.register(jwt, {
@@ -66,14 +66,12 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }
   }
 
-  // If a second OAuth account tries to sign in, reject it.
-  // Only the first user to authenticate owns this instance.
   app.addHook("preHandler", async (request) => {
     if (!request.url.startsWith("/api/auth")) return;
     if (!request.url.includes("/callback/google") && !request.url.includes("/callback/github"))
       return;
 
-    oauthCallbackUserCounts.set(request, await prisma.user.count());
+    oauthCallbackTimestamps.set(request, new Date());
   });
 
   async function sendDashboardVerificationEmail(email: string, request: FastifyRequest) {
@@ -102,7 +100,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       body: JSON.stringify({
         provider: 'google',
         callbackURL: ${JSON.stringify(`${frontendBaseUrl}/dashboard`)},
-        errorCallbackURL: ${JSON.stringify(`${frontendBaseUrl}/?error=single_user_instance`)}
+        errorCallbackURL: ${JSON.stringify(`${frontendBaseUrl}/?error=auth_failed`)}
       })
     });
     const data = await res.json();
@@ -131,7 +129,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       body: JSON.stringify({
         provider: 'github',
         callbackURL: ${JSON.stringify(`${frontendBaseUrl}/dashboard`)},
-        errorCallbackURL: ${JSON.stringify(`${frontendBaseUrl}/?error=single_user_instance`)}
+        errorCallbackURL: ${JSON.stringify(`${frontendBaseUrl}/?error=auth_failed`)}
       })
     });
     const data = await res.json();
@@ -150,13 +148,6 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   app.all("/api/auth/*", async (request, reply) => {
     const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
     const url = new URL(request.raw.url ?? "/", baseUrl);
-    if (
-      request.method === "POST" &&
-      url.pathname === "/api/auth/sign-up/email" &&
-      (await prisma.user.count()) >= 1
-    ) {
-      return reply.code(403).send({ error: "single_user_instance" });
-    }
     if (request.method === "POST" && url.pathname === "/api/auth/forget-password") {
       url.pathname = "/api/auth/request-password-reset";
     }
@@ -176,24 +167,16 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       }),
     );
 
-    const beforeCallbackUserCount = oauthCallbackUserCounts.get(request);
+    const callbackStartedAt = oauthCallbackTimestamps.get(request);
     let oauthSessionUser: { email: string; id: string } | undefined;
-    if (beforeCallbackUserCount !== undefined) {
-      const users: Array<{ email: string; id: string }> = await prisma.user.findMany({
-        orderBy: { createdAt: "asc" },
-        select: { email: true, id: true },
+    if (callbackStartedAt !== undefined && response.status >= 300 && response.status < 400) {
+      const session = await prisma.session.findFirst({
+        where: { createdAt: { gte: callbackStartedAt } },
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { id: true, email: true } } },
       });
-      if (beforeCallbackUserCount >= 1 && users.length > beforeCallbackUserCount) {
-        const extraUserIds = users.slice(1).map((user) => user.id);
-        await prisma.user.deleteMany({ where: { id: { in: extraUserIds } } });
-        return reply.redirect(
-          `${process.env.FRONTEND_BASE_URL ?? "http://localhost:3000"}/?error=single_user_instance`,
-        );
-      }
-
-      const user = users[0];
-      if (user && response.status >= 300 && response.status < 400) {
-        oauthSessionUser = user;
+      if (session?.user) {
+        oauthSessionUser = session.user;
       }
     }
 
