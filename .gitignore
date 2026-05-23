@@ -16,6 +16,9 @@ packages/client/
 # Publishing guide — local reference only
 PUBLISHING.md
 
+# Deployment runbook — local reference only
+DEPLOYMENT.md
+
 # Local task files — agent work notes, not committed
 tasks/
 
