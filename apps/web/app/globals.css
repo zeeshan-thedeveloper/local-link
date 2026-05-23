@@ -610,12 +610,13 @@ input, textarea, select { font-family: inherit; }
 /* Type selector for Add Resource */
 .type-select {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .type-select-card {
   background: var(--bg-2);
   border: 1px solid var(--border-input);
+  color: var(--text-1);
   border-radius: var(--radius);
   padding: 12px;
   cursor: pointer;
@@ -627,10 +628,12 @@ input, textarea, select { font-family: inherit; }
 .type-select-card.active {
   border-color: var(--accent-border);
   background: var(--accent-soft);
+  color: var(--text-0);
 }
 .type-select-card .top { display: flex; align-items: center; gap: 8px; }
-.type-select-card .name { font-size: 12.5px; font-weight: 500; }
+.type-select-card .name { font-size: 12.5px; font-weight: 600; color: var(--text-0); }
 .type-select-card .desc { font-size: 11.5px; color: var(--text-3); line-height: 1.4; }
+.type-select-card.active .desc { color: var(--text-2); }
 
 /* Slide-over */
 .scrim {
@@ -1198,11 +1201,15 @@ input, textarea, select { font-family: inherit; }
 [data-theme="light"] .type-select-card {
   background: #f5f5f7;
   border-color: rgba(0,0,0,0.09);
+  color: #24242c;
 }
 [data-theme="light"] .type-select-card.active {
   border-color: var(--accent-border);
   background: var(--accent-soft);
 }
+[data-theme="light"] .type-select-card .name { color: #16161d; }
+[data-theme="light"] .type-select-card .desc { color: #676775; }
+[data-theme="light"] .type-select-card.active .desc { color: #4f5870; }
 [data-theme="light"] .code {
   background: #f0f0f4;
   border-color: rgba(0,0,0,0.08);

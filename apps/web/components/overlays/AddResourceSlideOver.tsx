@@ -29,19 +29,16 @@ export function AddResourceSlideOver({
   onClose: () => void;
   onCreated?: (created: CreatedResource) => void;
 }) {
-  const [type, setType] = useState<ResourceType>("database");
+  const [type, setType] = useState<ResourceType>("web-app");
   const [name, setName] = useState("");
   const [localUrl, setLocalUrl] = useState("");
-  const [publicAccess, setPublicAccess] = useState(false);
   const [connectionString, setConnectionString] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const types: Array<{ id: ResourceType; name: string; desc: string }> = [
     { id: "web-app", name: "Web App", desc: "Connect a React, Vite, or Next.js app" },
-    { id: "api", name: "API", desc: "Connect a Node.js, Express, or FastAPI backend" },
     { id: "database", name: "Database", desc: "Postgres query endpoint" },
-    { id: "ai-model", name: "AI Model", desc: "OpenAI-compatible local model endpoint" },
   ];
 
   const submit = () => {
@@ -57,20 +54,9 @@ export function AddResourceSlideOver({
                   localUrl ||
                   "postgresql://locallink:locallink@localhost:5433/locallink",
               }
-            : type === "ai-model"
-              ? {
-                  provider: "openai-compatible",
-                  baseUrl: localUrl || "http://localhost:3000",
-                  model: name || "local",
-                }
-              : type === "web-app"
-                ? {
-                    url: localUrl || "http://localhost:3000",
-                  }
-                : {
-                    url: localUrl || "http://localhost:3000",
-                    publicAccess,
-                  };
+            : {
+                url: localUrl || "http://localhost:3000",
+              };
         const response = await fetch(`${gatewayUrl}/resources`, {
           method: "POST",
           credentials: "include",
@@ -154,28 +140,6 @@ export function AddResourceSlideOver({
               You can update this later with the host CLI setup wizard.
             </div>
           </div>
-          {type === "api" && (
-            <div className="field">
-              <label
-                style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={publicAccess}
-                  onChange={(event) => setPublicAccess(event.target.checked)}
-                  style={{ marginTop: 3 }}
-                />
-                <span>
-                  <strong>Public gateway URL</strong> — open in a browser without an API key
-                </span>
-              </label>
-              <div className="field-help">
-                Host token (<span className="mono">lhk_…</span>) is only for{" "}
-                <span className="mono">locallink setup</span>. API keys stay optional for
-                programmatic access.
-              </div>
-            </div>
-          )}
           {type === "database" && (
             <div className="field">
               <div className="field-label">
