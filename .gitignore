@@ -26,6 +26,9 @@ tasks/
 .actrc
 .npmrc
 
+# Design mockups — local only
+desing/
+
 # IDE and AI assistant config
 .cursor/
 .claude/
