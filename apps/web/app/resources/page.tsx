@@ -27,9 +27,7 @@ export default function ResourcesPage() {
   const types: Array<{ id: Filter; label: string }> = [
     { id: "all", label: "All" },
     { id: "web-app", label: "Web apps" },
-    { id: "api", label: "APIs" },
     { id: "database", label: "Databases" },
-    { id: "ai-model", label: "AI models" },
     { id: "http-api", label: "Legacy HTTP" },
   ];
   const items = useMemo(() => {
@@ -209,7 +207,7 @@ export default function ResourcesPage() {
             <div className="sub">
               {populated
                 ? "Try a different filter or search term."
-                : "Add a web app, API, database, or AI model to start routing through the gateway."}
+                : "Add a web app or database to start routing through the gateway."}
             </div>
             {!populated && (
               <button className="btn btn-primary" onClick={openAddResource}>
