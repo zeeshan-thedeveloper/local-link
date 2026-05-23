@@ -638,7 +638,7 @@ function extractSubdomainSlug(hostHeader: string | string[] | undefined) {
   if (!baseDomain) return null;
 
   const host = hostValue.split(":")[0]?.toLowerCase();
-  const normalizedBase = baseDomain.split(":")[0]?.replace(/^\.+|\.+$/g, "");
+  const normalizedBase = trimDots(baseDomain.split(":")[0] ?? "");
   if (!host || !normalizedBase || !host.endsWith(`.${normalizedBase}`)) return null;
 
   const subdomain = host.slice(0, -`.${normalizedBase}`.length);
@@ -646,11 +646,33 @@ function extractSubdomainSlug(hostHeader: string | string[] | undefined) {
 }
 
 function generateResourceSlug(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  let slug = "";
+  let pendingHyphen = false;
+
+  for (const char of name.toLowerCase().trim()) {
+    const code = char.charCodeAt(0);
+    const isLowerAlpha = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
+
+    if (isLowerAlpha || isDigit) {
+      if (pendingHyphen && slug) slug += "-";
+      slug += char;
+      pendingHyphen = false;
+      continue;
+    }
+
+    pendingHyphen = true;
+  }
+
+  return slug;
+}
+
+function trimDots(value: string) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === ".") start += 1;
+  while (end > start && value[end - 1] === ".") end -= 1;
+  return value.slice(start, end);
 }
 
 function requiresApiKey(resource: { type: string; config: unknown }) {
