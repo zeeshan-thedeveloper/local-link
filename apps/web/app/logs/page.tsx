@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { statusClass } from "@/lib/data";
+import { resourceEndpoint } from "@/lib/resource-url";
 import type { RequestLog, Resource, ResourceType } from "@/lib/types";
 
 type StatusFilter = "all" | "2xx" | "4xx" | "5xx";
@@ -47,7 +48,7 @@ export default function LogsPage() {
       .then(
         ([logsResponse, resourceItems]: [
           LogsResponse,
-          Array<Resource & { type: ResourceType | "ai_model" | "http_api" }>,
+          Array<Resource & { type: ResourceType | "ai_model" | "http_api" | "web_app" }>,
         ]) => {
           const normalizedResources = resourceItems.map(normalizeResource);
           const resourceMap = new Map(normalizedResources.map((item) => [item.id, item.name]));
@@ -293,12 +294,14 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
       ? "ai-model"
       : resource.type === "http_api"
         ? "http-api"
-        : resource.type;
-  return {
+        : resource.type === "web_app"
+          ? "web-app"
+          : resource.type;
+  const normalized: Resource = {
     ...resource,
     type: type as ResourceType,
     subtype: resource.subtype ?? type,
-    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    endpoint: resource.endpoint ?? "",
     local: resource.local ?? "-",
     status: !resource.active
       ? "inactive"
@@ -309,4 +312,5 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
     lastActive: resource.lastActive ?? "Never",
     reqs24h: resource.reqs24h ?? 0,
   };
+  return { ...normalized, endpoint: resource.endpoint ?? resourceEndpoint(normalized, gatewayUrl) };
 }

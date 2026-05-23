@@ -1,10 +1,11 @@
-export type ResourceType = "database" | "ai-model" | "http-api";
+export type ResourceType = "database" | "ai-model" | "http-api" | "web-app" | "api";
 export type ResourceStatus = "active" | "inactive" | "idle";
 export type HostStatus = "connected" | "disconnected";
 
 export interface Resource {
   id: string;
   name: string;
+  slug?: string;
   type: ResourceType;
   subtype: string;
   endpoint: string;

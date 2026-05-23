@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TypeBadge } from "@/components/ui/TypeBadge";
+import { resourceEndpoint } from "@/lib/resource-url";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
 import styles from "./page.module.css";
 
@@ -67,7 +68,7 @@ export default function ResourceDetailPage() {
 
   useEffect(() => {
     void Promise.all([
-      fetchJson<Resource & { type: ResourceType | "ai_model" | "http_api" }>(
+      fetchJson<Resource & { type: ResourceType | "ai_model" | "http_api" | "web_app" }>(
         `/resources/${params.id}`,
       ),
       fetchJson<ApiKey[]>(`/resources/${params.id}/keys`).catch(() => [] as ApiKey[]),
@@ -112,7 +113,7 @@ export default function ResourceDetailPage() {
     );
   }
 
-  const endpoint = `${gatewayUrl}/r/${resource.id}`;
+  const endpoint = resourceEndpoint(resource, gatewayUrl);
 
   return (
     <div className="page">
@@ -245,7 +246,7 @@ export default function ResourceDetailPage() {
         <ConfigSection
           resource={resource}
           endpoint={endpoint}
-          onSaved={(updated) => setResource((r) => (r ? { ...r, config: updated.config } : r))}
+          onSaved={(updated) => setResource(normalizeResource(updated))}
         />
       )}
     </div>
@@ -560,6 +561,7 @@ function RequestsTable({
 
 type DbConfig = { engine: string; connectionString?: string; filePath?: string };
 type HttpConfig = { url: string; publicAccess?: boolean; headers?: Record<string, string> };
+type AiConfig = { provider: string; baseUrl: string; model: string };
 
 function ConfigSection({
   resource,
@@ -570,11 +572,14 @@ function ConfigSection({
   endpoint: string;
   onSaved: (r: Resource) => void;
 }) {
-  const config = resource.config as DbConfig | HttpConfig | null | undefined;
+  const config = resource.config as DbConfig | HttpConfig | AiConfig | null | undefined;
   const isDb = resource.type === "database";
-  const isHttp = resource.type === "http-api";
+  const isHttp =
+    resource.type === "http-api" || resource.type === "web-app" || resource.type === "api";
+  const canTogglePublicAccess = resource.type === "http-api" || resource.type === "api";
 
   const [configTab, setConfigTab] = useState<"local" | "gateway">("local");
+  const [slug, setSlug] = useState(resource.slug ?? "");
   const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
   const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
   const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
@@ -586,7 +591,8 @@ function ConfigSection({
       setHttpUrl(http.url ?? "");
       setPublicAccess(http.publicAccess ?? false);
     }
-  }, [resource.id, resource.config, isHttp, config]);
+    setSlug(resource.slug ?? "");
+  }, [resource.id, resource.slug, resource.config, isHttp, config]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -597,11 +603,15 @@ function ConfigSection({
     try {
       const newConfig = isDb
         ? { engine: (config as DbConfig)?.engine ?? "postgres", connectionString: connStr }
-        : { url: httpUrl, publicAccess };
+        : isHttp
+          ? resource.type === "web-app"
+            ? { url: httpUrl }
+            : { url: httpUrl, publicAccess }
+          : config;
       const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ config: newConfig }),
+        body: JSON.stringify({ slug, config: newConfig }),
       });
       onSaved(updated);
       setSaved(true);
@@ -673,16 +683,18 @@ function ConfigSection({
 
               {isHttp && (
                 <>
-                  <div className="field">
-                    <div className="field-label">Local URL</div>
-                    <input
-                      className="input"
-                      type="text"
-                      value={httpUrl}
-                      onChange={(e) => setHttpUrl(e.target.value)}
-                      placeholder="http://localhost:25543"
-                    />
-                  </div>
+                  {canTogglePublicAccess && (
+                    <div className="field">
+                      <div className="field-label">Local URL</div>
+                      <input
+                        className="input"
+                        type="text"
+                        value={httpUrl}
+                        onChange={(e) => setHttpUrl(e.target.value)}
+                        placeholder="http://localhost:25543"
+                      />
+                    </div>
+                  )}
                   <div className="field">
                     <label
                       style={{
@@ -742,7 +754,18 @@ function ConfigSection({
           {configTab === "gateway" ? (
             <>
               <h3>Gateway Configuration</h3>
-              <p>Read-only identifiers used by external clients to reach this resource.</p>
+              <p>Identifiers used by external clients to reach this resource.</p>
+              <div className="field">
+                <div className="field-label">Slug</div>
+                <input
+                  className="input mono"
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="my-resource"
+                />
+                <div className="field-help">Use lowercase letters, numbers, and hyphens.</div>
+              </div>
               <dl className="kv-grid" style={{ margin: 0 }}>
                 <dt>Resource ID</dt>
                 <dd className="mono" style={{ fontSize: 12 }}>
@@ -755,6 +778,24 @@ function ConfigSection({
                   {endpoint}
                 </dd>
               </dl>
+              <div style={{ marginTop: 14 }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => void save()}
+                  disabled={saving}
+                >
+                  {saved ? (
+                    <>
+                      <Icon name="check" size={13} />
+                      Saved
+                    </>
+                  ) : saving ? (
+                    "Saving..."
+                  ) : (
+                    "Save changes"
+                  )}
+                </button>
+              </div>
               {resource.type === "http-api" ? (
                 <p className="field-help" style={{ marginTop: 12 }}>
                   {(config as HttpConfig)?.publicAccess ? (
@@ -770,6 +811,12 @@ function ConfigSection({
                       URL&quot; under Local Match to allow browser access.
                     </>
                   )}
+                </p>
+              ) : null}
+              {resource.type === "web-app" ? (
+                <p className="field-help" style={{ marginTop: 12 }}>
+                  Web apps are public and use subdomain routing, so assets load without a path
+                  prefix.
                 </p>
               ) : null}
             </>
@@ -792,18 +839,21 @@ function normalizeResource(resource: Omit<Resource, "type"> & { type: string }):
       ? "ai-model"
       : resource.type === "http_api"
         ? "http-api"
-        : resource.type;
-  return {
+        : resource.type === "web_app"
+          ? "web-app"
+          : resource.type;
+  const normalized: Resource = {
     ...resource,
     type: type as ResourceType,
     subtype: resource.subtype ?? type,
-    endpoint: resource.endpoint ?? `${gatewayUrl}/r/${resource.id}`,
+    endpoint: resource.endpoint ?? "",
     local: resource.local ?? "-",
     status: resource.active ? "active" : "inactive",
     keys: resource.keys ?? 0,
     lastActive: resource.lastActive ?? "Never",
     reqs24h: resource.reqs24h ?? 0,
   };
+  return { ...normalized, endpoint: resource.endpoint ?? resourceEndpoint(normalized, gatewayUrl) };
 }
 
 function normalizeLog(log: GatewayRequestLog): RequestLog {

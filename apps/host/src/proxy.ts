@@ -1,9 +1,11 @@
 import type {
   AiModelResourceConfig,
+  ApiResourceConfig,
   DatabaseResourceConfig,
   HttpResourceConfig,
   TunnelRequestPayload,
   TunnelResponsePayload,
+  WebAppResourceConfig,
 } from "@locallink/shared";
 import { Client } from "pg";
 import { buildUpstreamRequestHeaders, sanitizeUpstreamResponseHeaders } from "./proxy-headers.js";
@@ -13,6 +15,8 @@ export type LocalResource = {
 } & (
   | { type: "database"; config: DatabaseResourceConfig }
   | { type: "http-api"; config: HttpResourceConfig }
+  | { type: "web-app"; config: WebAppResourceConfig }
+  | { type: "api"; config: ApiResourceConfig }
   | { type: "ai-model"; config: AiModelResourceConfig }
 );
 
@@ -20,8 +24,8 @@ export async function proxyRequest(
   resource: LocalResource,
   request: TunnelRequestPayload,
 ): Promise<TunnelResponsePayload> {
-  if (resource.type === "http-api") {
-    return proxyHttp(resource.config as HttpResourceConfig, request);
+  if (resource.type === "http-api" || resource.type === "web-app" || resource.type === "api") {
+    return proxyHttp(resource.config, request);
   }
   if (resource.type === "database") {
     return queryPostgres(resource.config as DatabaseResourceConfig, request);
@@ -33,7 +37,7 @@ export async function proxyRequest(
 }
 
 async function proxyHttp(
-  config: HttpResourceConfig,
+  config: HttpResourceConfig | WebAppResourceConfig | ApiResourceConfig,
   request: TunnelRequestPayload,
 ): Promise<TunnelResponsePayload> {
   const upstreamOrigin = ensureTrailingSlash(config.url);
@@ -41,7 +45,7 @@ async function proxyHttp(
   const response = await fetch(target, {
     method: request.method,
     headers: buildUpstreamRequestHeaders(upstreamOrigin, {
-      ...config.headers,
+      ...("headers" in config ? config.headers : undefined),
       ...request.headers,
     }),
     body: request.body && !["GET", "HEAD"].includes(request.method) ? request.body : undefined,

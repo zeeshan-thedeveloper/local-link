@@ -6,7 +6,7 @@ import type { ResourceType } from "@/lib/types";
 type GatewayResource = {
   id: string;
   name: string;
-  type: ResourceType | "ai_model" | "http_api";
+  type: ResourceType | "ai_model" | "http_api" | "web_app";
   hostId: string;
   active: boolean;
   tokenPrefix?: string | null;
@@ -17,7 +17,13 @@ export async function createResource(formData: FormData) {
   const type = String(formData.get("type") ?? "database") as ResourceType;
   const localUrl = String(formData.get("localUrl") ?? "").trim();
   const connectionString = String(formData.get("connectionString") ?? "").trim();
-  if (type !== "database" && type !== "http-api") {
+  if (
+    type !== "database" &&
+    type !== "http-api" &&
+    type !== "web-app" &&
+    type !== "api" &&
+    type !== "ai-model"
+  ) {
     throw new Error("Unsupported resource type");
   }
 
@@ -27,7 +33,15 @@ export async function createResource(formData: FormData) {
           engine: "postgres",
           connectionString: connectionString || "postgresql://localhost:5432/app",
         }
-      : { url: localUrl || "http://localhost:3000" };
+      : type === "ai-model"
+        ? {
+            provider: "openai-compatible",
+            baseUrl: localUrl || "http://localhost:3000",
+            model: name,
+          }
+        : type === "web-app"
+          ? { url: localUrl || "http://localhost:3000" }
+          : { url: localUrl || "http://localhost:3000" };
 
   const created = await gatewayFetch<{ resource: GatewayResource; hostToken: string }>(
     "/resources",
@@ -48,5 +62,6 @@ export async function createResource(formData: FormData) {
 function normalizeResourceType(type: GatewayResource["type"]): ResourceType {
   if (type === "ai_model") return "ai-model";
   if (type === "http_api") return "http-api";
+  if (type === "web_app") return "web-app";
   return type;
 }

@@ -109,7 +109,7 @@ program
   .command("register")
   .requiredOption("--id <id>", "Resource id from the gateway")
   .option("--name <name>", "Display name")
-  .option("--type <type>", "database or http-api")
+  .option("--type <type>", "database, http-api, web-app, api, or ai-model")
   .option("--url <url>", "Local HTTP base URL")
   .option("--connection-string <url>", "Postgres connection string")
   .action(async (options: Record<string, string>) => {
@@ -219,12 +219,12 @@ async function promptForMissingResourceConfig(
     });
     return { type: "database", engine: "postgres", connectionString };
   }
-  if (host.type === "http-api") {
+  if (host.type === "http-api" || host.type === "web-app" || host.type === "api") {
     const url = await input({
       message: "Local HTTP base URL:",
       default: "http://localhost:3000",
     });
-    return { type: "http-api", url };
+    return { type: host.type, url };
   }
 
   const baseUrl = await input({
@@ -243,15 +243,15 @@ function toResource(
 
   const name = options.name ?? existing.name;
   const type = options.type ?? existing.type;
-  if (type === "http-api") {
-    if (!options.url) throw new Error("--url is required for http-api resources");
+  if (type === "http-api" || type === "web-app" || type === "api") {
+    if (!options.url) throw new Error(`--url is required for ${type} resources`);
     return {
       id,
       name,
-      type: "http-api",
+      type,
       token: existing.token,
-      config: { type: "http-api", url: options.url },
-    };
+      config: { type, url: options.url },
+    } as HostResourceConfig;
   }
   if (type === "database") {
     if (!options.connectionString)
@@ -264,7 +264,7 @@ function toResource(
       config: { type: "database", engine: "postgres", connectionString: options.connectionString },
     };
   }
-  throw new Error("Unsupported resource type. Use database or http-api.");
+  throw new Error("Unsupported resource type. Use database, http-api, web-app, api, or ai-model.");
 }
 
 function requireOption(value: string | undefined, name: string) {
@@ -302,6 +302,8 @@ function defaultResourceConfig(type: HostResourceConfig["type"]): HostResourceCo
       baseUrl: "http://localhost:3000",
       model: "local",
     };
+  if (type === "web-app") return { type: "web-app", url: "http://localhost:3000" };
+  if (type === "api") return { type: "api", url: "http://localhost:3000" };
   return { type: "http-api", url: "http://localhost:3000" };
 }
 
