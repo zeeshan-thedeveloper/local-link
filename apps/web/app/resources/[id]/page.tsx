@@ -10,11 +10,13 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { gatewayBaseDomain, resourceEndpoint } from "@/lib/resource-url";
+import { generateSlug } from "@/lib/slug";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
 import styles from "./page.module.css";
 
 type Tab = "overview" | "connect" | "keys" | "logs" | "config";
 type HostStatus = { id: string; socketId: string; lastSeen: string | null };
+type SlugStatus = "idle" | "checking" | "available" | "taken";
 type GatewayRequestLog = Partial<RequestLog> & {
   id: string;
   resourceId: string;
@@ -264,7 +266,7 @@ export default function ResourceDetailPage() {
           {resource.type !== "web-app" && (
             <KeysSection
               keys={keys}
-              onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)}
+              onGenerateKey={() => openGenerateKey(resource, refreshKeys)}
               onRevokeKey={revokeKey}
             />
           )}
@@ -277,14 +279,16 @@ export default function ResourceDetailPage() {
           resource={resource}
           endpoint={endpoint}
           host={host}
+          keys={keys}
           rotatedToken={rotatedToken}
           onOpenKeys={() => setTab("keys")}
+          onOpenConfig={() => setTab("config")}
         />
       )}
       {tab === "keys" && resource.type !== "web-app" && (
         <KeysSection
           keys={keys}
-          onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)}
+          onGenerateKey={() => openGenerateKey(resource, refreshKeys)}
           onRevokeKey={revokeKey}
         />
       )}
@@ -313,14 +317,18 @@ function ConnectSection({
   resource,
   endpoint,
   host,
+  keys,
   rotatedToken,
   onOpenKeys,
+  onOpenConfig,
 }: {
   resource: Resource;
   endpoint: string;
   host?: HostStatus;
+  keys: ApiKey[];
   rotatedToken: string | null;
   onOpenKeys: () => void;
+  onOpenConfig: () => void;
 }) {
   const tokenArg = rotatedToken ?? "<host token from Config>";
   const setupSteps = [
@@ -343,79 +351,218 @@ function ConnectSection({
 
   if (host) {
     return (
-      <div className="section">
-        <div className="section-head">
-          <div>
-            <h3 className="section-title">Host connected</h3>
-            <p className="section-sub">This resource is online and ready to proxy requests.</p>
+      <>
+        <div className="section">
+          <div className="section-head">
+            <div>
+              <h3 className="section-title">Host connected</h3>
+              <p className="section-sub">This resource is online and ready to proxy requests.</p>
+            </div>
+            <div
+              style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}
+            >
+              <StatusPill status="connected" label="Online" />
+              <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                Last seen {formatDate(host.lastSeen)}
+              </span>
+            </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-            <StatusPill status="connected" label="Online" />
-            <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
-              Last seen {formatDate(host.lastSeen)}
-            </span>
+          <div style={{ padding: 18, display: "grid", gap: 14 }}>
+            <div className="code">
+              <span className="text">{endpoint}</span>
+              <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
+            </div>
+            <p className="field-help" style={{ margin: 0 }}>
+              Setup instructions are hidden while the host is online. Host token management is
+              available in Config.
+            </p>
           </div>
         </div>
-        <div style={{ padding: 18, display: "grid", gap: 14 }}>
-          <div className="code">
-            <span className="text">{endpoint}</span>
-            <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
-          </div>
-          <p className="field-help" style={{ margin: 0 }}>
-            Setup instructions are hidden while the host is online. Host token management is
-            available in Config.
-          </p>
-        </div>
-      </div>
+        {resource.type === "api" && (
+          <CallThisApiSection
+            resource={resource}
+            endpoint={endpoint}
+            keys={keys}
+            onOpenKeys={onOpenKeys}
+          />
+        )}
+      </>
     );
   }
 
   return (
-    <div className="section">
-      <div className="section-head">
-        <div>
-          <h3 className="section-title">Connect host</h3>
-          <p className="section-sub">
-            Run these commands on the machine where your local resource is running.
+    <>
+      <div className="section">
+        <div className="section-head">
+          <div>
+            <h3 className="section-title">Connect host</h3>
+            <p className="section-sub">
+              Run these commands on the machine where your local resource is running.
+            </p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <StatusPill status="disconnected" label="Offline" />
+          </div>
+        </div>
+        <div style={{ padding: 18, display: "grid", gap: 14 }}>
+          <div style={{ display: "grid", gap: 14 }}>
+            {setupSteps.map((step) => (
+              <CommandStep
+                key={step.number}
+                number={step.number}
+                label={step.label}
+                command={step.command}
+              />
+            ))}
+          </div>
+          {resource.type === "web-app" ? (
+            <div className="callout" style={{ gap: 8 }}>
+              <Icon name="globe" size={14} />
+              <span>
+                <strong>Web apps are public.</strong> Once connected, anyone can open{" "}
+                <a
+                  href={endpoint}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mono"
+                  style={{ color: "var(--accent)" }}
+                >
+                  {endpoint}
+                </a>{" "}
+                in a browser - no API key needed.
+              </span>
+            </div>
+          ) : (
+            <div className="callout">
+              <Icon name="key" size={14} />
+              <span>
+                Requests require an API key. Generate one under the{" "}
+                <button
+                  type="button"
+                  onClick={onOpenKeys}
+                  style={{
+                    background: "transparent",
+                    border: 0,
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    font: "inherit",
+                    padding: 0,
+                  }}
+                >
+                  API Keys
+                </button>{" "}
+                tab.
+              </span>
+            </div>
+          )}
+          <p className="field-help" style={{ margin: 0 }}>
+            The original token is shown only once. Generate a replacement in the{" "}
+            <button
+              type="button"
+              onClick={onOpenConfig}
+              style={{
+                background: "transparent",
+                border: 0,
+                color: "var(--accent)",
+                cursor: "pointer",
+                font: "inherit",
+                padding: 0,
+              }}
+            >
+              Config
+            </button>{" "}
+            tab when you need to connect this resource again.
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <StatusPill status="disconnected" label="Offline" />
+      </div>
+      {resource.type === "api" && (
+        <CallThisApiSection
+          resource={resource}
+          endpoint={endpoint}
+          keys={keys}
+          onOpenKeys={onOpenKeys}
+        />
+      )}
+    </>
+  );
+}
+
+function CallThisApiSection({
+  resource,
+  endpoint,
+  keys,
+  onOpenKeys,
+}: {
+  resource: Resource;
+  endpoint: string;
+  keys: ApiKey[];
+  onOpenKeys: () => void;
+}) {
+  const [tab, setTab] = useState<"curl" | "javascript" | "python">("curl");
+  const config = resource.config as HttpConfig | null | undefined;
+  const base = endpoint.replace(/\/$/, "");
+  const exampleUrl = `${base}/users`;
+  const keyExample = keys[0]?.prefix ? `${keys[0].prefix}...` : "ll_xxxxxxxxxxxx";
+  const publicAccess = Boolean(config?.publicAccess);
+  const snippets = {
+    curl: `curl ${exampleUrl} \\\n  -H "Authorization: Bearer ${keyExample}"`,
+    javascript: `const res = await fetch("${exampleUrl}", {\n  headers: {\n    Authorization: "Bearer ${keyExample}",\n  },\n});\nconst data = await res.json();`,
+    python: `import requests\n\nres = requests.get(\n    "${exampleUrl}",\n    headers={"Authorization": "Bearer ${keyExample}"},\n)\ndata = res.json()`,
+  };
+  const currentSnippet = snippets[tab];
+  const sdkSnippet = `import { createClient } from "@locallink/client";\n\nconst api = createClient({\n  gateway: "${base}",\n  apiKey: process.env.LOCALLINK_API_KEY,\n});\n\nconst res = await api.get("/users");\nconst data = await res.json();`;
+
+  return (
+    <div className="section" style={{ marginTop: 18 }}>
+      <div className="section-head">
+        <div>
+          <h3 className="section-title">Calling this API</h3>
+          <p className="section-sub">Use this endpoint from any app or service.</p>
         </div>
       </div>
       <div style={{ padding: 18, display: "grid", gap: 14 }}>
-        <div style={{ display: "grid", gap: 14 }}>
-          {setupSteps.map((step) => (
-            <CommandStep
-              key={step.number}
-              number={step.number}
-              label={step.label}
-              command={step.command}
-            />
-          ))}
-        </div>
-        {resource.type === "web-app" ? (
+        {publicAccess ? (
           <div className="callout" style={{ gap: 8 }}>
             <Icon name="globe" size={14} />
-            <span>
-              <strong>Web apps are public.</strong> Once connected, anyone can open{" "}
-              <a
-                href={endpoint}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mono"
-                style={{ color: "var(--accent)" }}
-              >
-                {endpoint}
-              </a>{" "}
-              in a browser - no API key needed.
-            </span>
+            <span>Public access is enabled - no key required. Manage this in Config.</span>
           </div>
         ) : (
-          <div className="callout">
-            <Icon name="key" size={14} />
-            <span>
-              Requests require an API key. Generate one under the{" "}
+          <>
+            <div className="tabs" style={{ borderBottom: "1px solid var(--border)" }}>
+              {[
+                ["curl", "curl"],
+                ["javascript", "JavaScript"],
+                ["python", "Python"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  className={"tab " + (tab === id ? "active" : "")}
+                  type="button"
+                  onClick={() => setTab(id as typeof tab)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 8,
+                }}
+              >
+                <div className="field-label">Example request</div>
+                <CopyBtn onCopy={() => void navigator.clipboard.writeText(currentSnippet)} />
+              </div>
+              <pre className="code-block" style={{ margin: 0 }}>
+                {currentSnippet}
+              </pre>
+            </div>
+            <p className="field-help" style={{ margin: 0 }}>
+              Find and manage your keys in the{" "}
               <button
                 type="button"
                 onClick={onOpenKeys}
@@ -431,8 +578,72 @@ function ConnectSection({
                 API Keys
               </button>{" "}
               tab.
-            </span>
-          </div>
+            </p>
+            <details
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                background: "var(--bg-2)",
+                padding: 14,
+              }}
+            >
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                Use the JS SDK
+              </summary>
+              <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div className="field-label">Install</div>
+                    <CopyBtn
+                      onCopy={() =>
+                        void navigator.clipboard.writeText("npm install @locallink/client")
+                      }
+                    />
+                  </div>
+                  <pre className="code-block" style={{ margin: 0 }}>
+                    npm install @locallink/client
+                  </pre>
+                </div>
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div className="field-label">Usage</div>
+                    <CopyBtn onCopy={() => void navigator.clipboard.writeText(sdkSnippet)} />
+                  </div>
+                  <pre className="code-block" style={{ margin: 0 }}>
+                    {sdkSnippet}
+                  </pre>
+                </div>
+                <p className="field-help" style={{ margin: 0 }}>
+                  Package docs are available on{" "}
+                  <a
+                    href="https://www.npmjs.com/package/@locallink/client"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    npm
+                  </a>{" "}
+                  and in the repository README.
+                </p>
+              </div>
+            </details>
+          </>
         )}
       </div>
     </div>
@@ -497,6 +708,15 @@ function KeysSection({
           <Icon name="plus" size={12} />
           Generate key
         </button>
+      </div>
+      <div className="callout" style={{ margin: "0 18px 18px" }}>
+        <Icon name="info" size={14} />
+        <div>
+          <div>Keys are shown in full only once at creation time.</div>
+          <div className="field-help" style={{ margin: 0 }}>
+            If you lose a key, revoke it and generate a new one.
+          </div>
+        </div>
       </div>
       <table className="tbl">
         <thead>
@@ -701,6 +921,8 @@ function ConfigSection({
   const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
   const [show, setShow] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const http = config as HttpConfig | undefined;
@@ -713,6 +935,50 @@ function ConfigSection({
   const [saving, setSaving] = useState(false);
   const [savedSection, setSavedSection] = useState<"public" | "local" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const publicSlugBlocked = slugStatus === "checking" || slugStatus === "taken" || !slug;
+
+  useEffect(() => {
+    if (!slug) {
+      setSlugStatus("idle");
+      setSlugSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setSlugStatus("checking");
+    setSlugSuggestions([]);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const query = new URLSearchParams({ slug, excludeId: resource.id });
+        const response = await fetch(`${gatewayUrl}/resources/check-slug?${query.toString()}`, {
+          credentials: "include",
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          available?: boolean;
+          suggestions?: string[];
+        };
+        if (cancelled) return;
+        if (response.ok && data.available) {
+          setSlugStatus("available");
+          setSlugSuggestions([]);
+          return;
+        }
+        setSlugStatus("taken");
+        setSlugSuggestions(data.suggestions ?? []);
+      } catch {
+        if (!cancelled) {
+          setSlugStatus("idle");
+          setSlugSuggestions([]);
+        }
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [resource.id, slug]);
 
   const savePublicEndpoint = async () => {
     setSaving(true);
@@ -877,7 +1143,7 @@ function ConfigSection({
               className="input mono"
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
+              onChange={(e) => setSlug(generateSlug(e.target.value))}
               placeholder="my-resource"
             />
             <div className="field-help">
@@ -886,12 +1152,18 @@ function ConfigSection({
                 {slug || "my-resource"}.{gatewayBaseDomain}
               </span>
             </div>
+            <SlugAvailability
+              slug={slug}
+              status={slugStatus}
+              suggestions={slugSuggestions}
+              onSelect={setSlug}
+            />
           </div>
           <div>
             <button
               className="btn btn-primary btn-sm"
               onClick={() => void savePublicEndpoint()}
-              disabled={saving}
+              disabled={saving || publicSlugBlocked}
             >
               {savedSection === "public" ? (
                 <>
@@ -1023,8 +1295,65 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 
 async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${gatewayUrl}${path}`, { credentials: "include", ...init });
-  if (!response.ok) throw new Error(`Gateway request failed: ${response.status}`);
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Gateway request failed: ${response.status}`);
+  }
   return response.json() as Promise<T>;
+}
+
+function SlugAvailability({
+  slug,
+  status,
+  suggestions,
+  onSelect,
+}: {
+  slug: string;
+  status: SlugStatus;
+  suggestions: string[];
+  onSelect: (suggestion: string) => void;
+}) {
+  if (!slug || status === "idle") return null;
+
+  const tone =
+    status === "available" ? "var(--green)" : status === "taken" ? "var(--red)" : "var(--text-3)";
+
+  return (
+    <div className="field-help" style={{ color: tone, display: "grid", gap: 8 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {status === "checking" ? (
+          <>
+            <Icon name="refresh" size={13} />
+            Checking availability...
+          </>
+        ) : status === "available" ? (
+          <>
+            <Icon name="check" size={13} />
+            {slug} is available
+          </>
+        ) : (
+          <>
+            <Icon name="warn" size={13} />
+            {slug} is taken
+          </>
+        )}
+      </span>
+      {status === "taken" && suggestions.length > 0 && (
+        <span style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {suggestions.map((suggestion) => (
+            <button
+              className="chip"
+              type="button"
+              key={suggestion}
+              onClick={() => onSelect(suggestion)}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function normalizeResource(resource: Omit<Resource, "type"> & { type: string }): Resource {

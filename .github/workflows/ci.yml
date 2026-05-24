@@ -34,7 +34,7 @@ jobs:
             services/*/node_modules
             packages/*/node_modules
             examples/*/node_modules
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/package.json') }}
 
   lint:
     name: Lint
@@ -58,7 +58,8 @@ jobs:
             services/*/node_modules
             packages/*/node_modules
             examples/*/node_modules
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/package.json') }}
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm lint
 
   typecheck:
@@ -83,7 +84,8 @@ jobs:
             services/*/node_modules
             packages/*/node_modules
             examples/*/node_modules
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/package.json') }}
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm typecheck
 
   test:
@@ -108,7 +110,8 @@ jobs:
             services/*/node_modules
             packages/*/node_modules
             examples/*/node_modules
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/package.json') }}
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm test:coverage
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
@@ -140,5 +143,6 @@ jobs:
             services/*/node_modules
             packages/*/node_modules
             examples/*/node_modules
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/package.json') }}
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
