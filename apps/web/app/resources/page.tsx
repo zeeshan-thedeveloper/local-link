@@ -27,7 +27,9 @@ export default function ResourcesPage() {
   const types: Array<{ id: Filter; label: string }> = [
     { id: "all", label: "All" },
     { id: "web-app", label: "Web apps" },
+    { id: "api", label: "APIs" },
     { id: "database", label: "Databases" },
+    { id: "ai-model", label: "AI models" },
     { id: "http-api", label: "Legacy HTTP" },
   ];
   const items = useMemo(() => {

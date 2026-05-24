@@ -9,7 +9,7 @@ import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TypeBadge } from "@/components/ui/TypeBadge";
-import { resourceEndpoint } from "@/lib/resource-url";
+import { gatewayBaseDomain, resourceEndpoint } from "@/lib/resource-url";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
 import styles from "./page.module.css";
 
@@ -168,6 +168,17 @@ export default function ResourceDetailPage() {
             Connect
           </button>
         </div>
+
+        {resource.type === "http-api" ? (
+          <div className="callout" style={{ margin: "0 18px 18px" }}>
+            <Icon name="warn" size={14} />
+            <span>
+              This is a legacy HTTP resource. It still works through the path-based{" "}
+              <span className="mono">/r/{resource.id}</span> route, but new browser apps and APIs
+              should use Web App or API resources.
+            </span>
+          </div>
+        ) : null}
 
         <div className="tabs">
           {tabs.map((item) => (
@@ -822,7 +833,9 @@ function ConfigSection({
                 />
                 <div className="field-help">
                   Used in your gateway URL:{" "}
-                  <span className="mono">{slug || "my-resource"}.locallink.zeeshanahmed.app</span>
+                  <span className="mono">
+                    {slug || "my-resource"}.{gatewayBaseDomain}
+                  </span>
                 </div>
               </div>
               <div>
