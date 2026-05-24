@@ -279,7 +279,6 @@ export default function ResourceDetailPage() {
           host={host}
           rotatedToken={rotatedToken}
           onOpenKeys={() => setTab("keys")}
-          onOpenConfig={() => setTab("config")}
         />
       )}
       {tab === "keys" && resource.type !== "web-app" && (
@@ -316,14 +315,12 @@ function ConnectSection({
   host,
   rotatedToken,
   onOpenKeys,
-  onOpenConfig,
 }: {
   resource: Resource;
   endpoint: string;
   host?: HostStatus;
   rotatedToken: string | null;
   onOpenKeys: () => void;
-  onOpenConfig: () => void;
 }) {
   const tokenArg = rotatedToken ?? "<host token from Config>";
   const setupSteps = [
@@ -437,24 +434,6 @@ function ConnectSection({
             </span>
           </div>
         )}
-        <p className="field-help" style={{ margin: 0 }}>
-          The original token is shown only once. Generate a replacement in the{" "}
-          <button
-            type="button"
-            onClick={onOpenConfig}
-            style={{
-              background: "transparent",
-              border: 0,
-              color: "var(--accent)",
-              cursor: "pointer",
-              font: "inherit",
-              padding: 0,
-            }}
-          >
-            Config
-          </button>{" "}
-          tab when you need to connect this resource again.
-        </p>
       </div>
     </div>
   );
