@@ -193,6 +193,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       }),
     );
 
+    const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
     const callbackStartedAt = oauthCallbackTimestamps.get(request);
     const setCookieHeaders = responseHeaders.getSetCookie?.() ?? [];
     let oauthSessionUser: DashboardUser | undefined;
@@ -214,7 +215,6 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }
 
     reply.status(response.status);
-    const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
     responseHeaders.forEach((value, key) => {
       if (key.toLowerCase() !== "set-cookie") {
         reply.header(key, value);
