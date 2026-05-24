@@ -9,7 +9,6 @@ const buildBranch = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GITHUB_REF_
 
 const nextConfig: NextConfig = {
   output: process.env.NEXT_OUTPUT_STANDALONE === "1" ? "standalone" : undefined,
-  transpilePackages: ["@locallink/shared"],
   env: {
     NEXT_PUBLIC_BUILD_SHA: buildSha,
     NEXT_PUBLIC_BUILD_BRANCH: buildBranch,
