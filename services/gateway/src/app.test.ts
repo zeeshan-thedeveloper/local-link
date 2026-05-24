@@ -103,7 +103,6 @@ describe("gateway app", () => {
     prisma.state.users.push({
       id: "user_1",
       email: "me@example.com",
-      name: null,
       passwordHash: "",
       emailVerified: true,
     });
@@ -113,10 +112,7 @@ describe("gateway app", () => {
       jwtSecret: "test-secret",
       tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
-    const token = app.jwt.sign(
-      { sub: "user_1", email: "me@example.com", name: null },
-      { expiresIn: "7d" },
-    );
+    const token = app.jwt.sign({ sub: "user_1", email: "me@example.com" }, { expiresIn: "7d" });
     cookie = `locallink_session=${token}`;
     await app.close();
   });
