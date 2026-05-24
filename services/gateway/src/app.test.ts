@@ -214,6 +214,56 @@ describe("gateway app", () => {
     await app.close();
   });
 
+  it("checks resource slug availability", async () => {
+    prisma.state.resources.push(
+      { id: "res_1", name: "Local API", slug: "local-api", type: "http_api", active: true },
+      { id: "res_2", name: "Local API 2", slug: "local-api-2", type: "http_api", active: true },
+    );
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send: vi.fn() },
+    });
+
+    const available = await app.inject({
+      method: "GET",
+      url: "/resources/check-slug?slug=new-api",
+      headers: { cookie },
+    });
+    expect(available.statusCode).toBe(200);
+    expect(available.json()).toMatchObject({ available: true });
+
+    const taken = await app.inject({
+      method: "GET",
+      url: "/resources/check-slug?slug=local-api",
+      headers: { cookie },
+    });
+    expect(taken.statusCode).toBe(200);
+    expect(taken.json()).toMatchObject({
+      available: false,
+      suggestions: expect.arrayContaining(["local-api-3"]),
+    });
+    expect(taken.json().suggestions).toHaveLength(3);
+
+    const self = await app.inject({
+      method: "GET",
+      url: "/resources/check-slug?slug=local-api&excludeId=res_1",
+      headers: { cookie },
+    });
+    expect(self.statusCode).toBe(200);
+    expect(self.json()).toMatchObject({ available: true });
+
+    const invalid = await app.inject({
+      method: "GET",
+      url: "/resources/check-slug?slug=Bad%20Slug",
+      headers: { cookie },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toMatchObject({ error: "Invalid slug format" });
+
+    await app.close();
+  });
+
   it("proxies resource root path without a trailing subpath", async () => {
     const send = vi.fn().mockResolvedValue({
       statusCode: 200,

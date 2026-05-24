@@ -1,5 +1,6 @@
 "use client";
 
+import { generateSlug } from "@locallink/shared";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
@@ -15,6 +16,7 @@ import styles from "./page.module.css";
 
 type Tab = "overview" | "connect" | "keys" | "logs" | "config";
 type HostStatus = { id: string; socketId: string; lastSeen: string | null };
+type SlugStatus = "idle" | "checking" | "available" | "taken";
 type GatewayRequestLog = Partial<RequestLog> & {
   id: string;
   resourceId: string;
@@ -722,6 +724,8 @@ function ConfigSection({
   const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
   const [show, setShow] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     const http = config as HttpConfig | undefined;
@@ -734,6 +738,50 @@ function ConfigSection({
   const [saving, setSaving] = useState(false);
   const [savedSection, setSavedSection] = useState<"public" | "local" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const publicSlugBlocked = slugStatus === "checking" || slugStatus === "taken" || !slug;
+
+  useEffect(() => {
+    if (!slug) {
+      setSlugStatus("idle");
+      setSlugSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setSlugStatus("checking");
+    setSlugSuggestions([]);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const query = new URLSearchParams({ slug, excludeId: resource.id });
+        const response = await fetch(`${gatewayUrl}/resources/check-slug?${query.toString()}`, {
+          credentials: "include",
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          available?: boolean;
+          suggestions?: string[];
+        };
+        if (cancelled) return;
+        if (response.ok && data.available) {
+          setSlugStatus("available");
+          setSlugSuggestions([]);
+          return;
+        }
+        setSlugStatus("taken");
+        setSlugSuggestions(data.suggestions ?? []);
+      } catch {
+        if (!cancelled) {
+          setSlugStatus("idle");
+          setSlugSuggestions([]);
+        }
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [resource.id, slug]);
 
   const savePublicEndpoint = async () => {
     setSaving(true);
@@ -898,7 +946,7 @@ function ConfigSection({
               className="input mono"
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
+              onChange={(e) => setSlug(generateSlug(e.target.value))}
               placeholder="my-resource"
             />
             <div className="field-help">
@@ -907,12 +955,18 @@ function ConfigSection({
                 {slug || "my-resource"}.{gatewayBaseDomain}
               </span>
             </div>
+            <SlugAvailability
+              slug={slug}
+              status={slugStatus}
+              suggestions={slugSuggestions}
+              onSelect={setSlug}
+            />
           </div>
           <div>
             <button
               className="btn btn-primary btn-sm"
               onClick={() => void savePublicEndpoint()}
-              disabled={saving}
+              disabled={saving || publicSlugBlocked}
             >
               {savedSection === "public" ? (
                 <>
@@ -1044,8 +1098,65 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 
 async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${gatewayUrl}${path}`, { credentials: "include", ...init });
-  if (!response.ok) throw new Error(`Gateway request failed: ${response.status}`);
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Gateway request failed: ${response.status}`);
+  }
   return response.json() as Promise<T>;
+}
+
+function SlugAvailability({
+  slug,
+  status,
+  suggestions,
+  onSelect,
+}: {
+  slug: string;
+  status: SlugStatus;
+  suggestions: string[];
+  onSelect: (suggestion: string) => void;
+}) {
+  if (!slug || status === "idle") return null;
+
+  const tone =
+    status === "available" ? "var(--green)" : status === "taken" ? "var(--red)" : "var(--text-3)";
+
+  return (
+    <div className="field-help" style={{ color: tone, display: "grid", gap: 8 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {status === "checking" ? (
+          <>
+            <Icon name="refresh" size={13} />
+            Checking availability...
+          </>
+        ) : status === "available" ? (
+          <>
+            <Icon name="check" size={13} />
+            {slug} is available
+          </>
+        ) : (
+          <>
+            <Icon name="warn" size={13} />
+            {slug} is taken
+          </>
+        )}
+      </span>
+      {status === "taken" && suggestions.length > 0 && (
+        <span style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {suggestions.map((suggestion) => (
+            <button
+              className="chip"
+              type="button"
+              key={suggestion}
+              onClick={() => onSelect(suggestion)}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function normalizeResource(resource: Omit<Resource, "type"> & { type: string }): Resource {

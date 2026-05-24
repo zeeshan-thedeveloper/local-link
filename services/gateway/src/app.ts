@@ -371,6 +371,35 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }));
   });
 
+  app.get("/resources/check-slug", { preHandler: requireDashboardAuth }, async (request, reply) => {
+    const { slug, excludeId } = request.query as { slug?: string; excludeId?: string };
+    if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      return reply.code(400).send({ error: "Invalid slug format" });
+    }
+
+    const existing = await prisma.resource.findUnique({ where: { slug } });
+    const taken = existing != null && existing.id !== (excludeId ?? "");
+    if (!taken) return reply.send({ available: true });
+
+    const suggestions: string[] = [];
+    for (let n = 2; n <= 9 && suggestions.length < 2; n++) {
+      const candidate = `${slug}-${n}`;
+      const conflict = await prisma.resource.findUnique({ where: { slug: candidate } });
+      if (!conflict) suggestions.push(candidate);
+    }
+
+    let randomSuggestion = "";
+    do {
+      randomSuggestion = `${slug}-${Math.random().toString(16).slice(2, 6)}`;
+    } while (
+      !randomSuggestion ||
+      (await prisma.resource.findUnique({ where: { slug: randomSuggestion } }))
+    );
+    suggestions.push(randomSuggestion);
+
+    return reply.send({ available: false, suggestions: suggestions.slice(0, 3) });
+  });
+
   app.post("/resources", { preHandler: requireDashboardAuth }, async (request, reply) => {
     const parsed = resourceRegistrationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
