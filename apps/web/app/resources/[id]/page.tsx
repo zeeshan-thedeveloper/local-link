@@ -1,6 +1,5 @@
 "use client";
 
-import { generateSlug } from "@locallink/shared";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
@@ -11,6 +10,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { gatewayBaseDomain, resourceEndpoint } from "@/lib/resource-url";
+import { generateSlug } from "@/lib/slug";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
 import styles from "./page.module.css";
 

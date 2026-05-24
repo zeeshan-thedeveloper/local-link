@@ -1,9 +1,9 @@
 "use client";
 
-import { generateSlug } from "@locallink/shared";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
+import { generateSlug } from "@/lib/slug";
 import type { ResourceType } from "@/lib/types";
 
 type CreatedResource = {
