@@ -282,6 +282,7 @@ export default function ResourceDetailPage() {
           keys={keys}
           rotatedToken={rotatedToken}
           onOpenKeys={() => setTab("keys")}
+          onOpenConfig={() => setTab("config")}
         />
       )}
       {tab === "keys" && resource.type !== "web-app" && (
@@ -319,6 +320,7 @@ function ConnectSection({
   keys,
   rotatedToken,
   onOpenKeys,
+  onOpenConfig,
 }: {
   resource: Resource;
   endpoint: string;
@@ -326,6 +328,7 @@ function ConnectSection({
   keys: ApiKey[];
   rotatedToken: string | null;
   onOpenKeys: () => void;
+  onOpenConfig: () => void;
 }) {
   const tokenArg = rotatedToken ?? "<host token from Config>";
   const setupSteps = [
