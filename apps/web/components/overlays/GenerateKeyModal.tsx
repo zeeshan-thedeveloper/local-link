@@ -3,20 +3,23 @@
 import { useState } from "react";
 import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
+import { resourceEndpoint } from "@/lib/resource-url";
+import type { ResourceType } from "@/lib/types";
 
 type Props = {
   open: boolean;
-  resourceId: string | null;
+  resource: { id: string; type: ResourceType; slug?: string } | null;
   gatewayUrl: string;
   onClose: () => void;
   onCreated: () => void;
 };
 
-export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCreated }: Props) {
+export function GenerateKeyModal({ open, resource, gatewayUrl, onClose, onCreated }: Props) {
   const [name, setName] = useState("");
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resourceId = resource?.id ?? null;
 
   const close = () => {
     setCreatedKey(null);
@@ -34,7 +37,7 @@ export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCrea
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name: name.trim() }),
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = (await res.json()) as { key: string };
@@ -47,8 +50,14 @@ export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCrea
     }
   };
 
-  const curlExample = createdKey && resourceId
-    ? `curl ${gatewayUrl}/r/${resourceId}/your-path \\\n  -H "Authorization: Bearer ${createdKey}"`
+  const endpointBase = resource
+    ? resourceEndpoint(resource, gatewayUrl).replace(/\/$/, "")
+    : resourceId
+      ? `${gatewayUrl}/r/${resourceId}`
+      : "";
+
+  const curlExample = createdKey
+    ? `curl ${endpointBase}/your-path \\\n  -H "Authorization: Bearer ${createdKey}"`
     : "";
 
   return (
@@ -68,18 +77,32 @@ export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCrea
                   className="input"
                   placeholder="e.g. my-service-prod"
                   value={name}
-                  onChange={e => setName(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") void generate(); }}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void generate();
+                  }}
                   autoFocus
                 />
                 <div className="field-help">A label so you can recognize this key later</div>
               </div>
-              {error && <div className="callout" style={{ color: "var(--red)" }}><Icon name="warn" size={14} />{error}</div>}
+              {error && (
+                <div className="callout" style={{ color: "var(--red)" }}>
+                  <Icon name="warn" size={14} />
+                  {error}
+                </div>
+              )}
             </div>
             <div className="modal-foot">
-              <button className="btn btn-ghost" onClick={close}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => void generate()} disabled={!name.trim() || loading}>
-                <Icon name="key" size={13} />{loading ? "Generating…" : "Generate key"}
+              <button className="btn btn-ghost" onClick={close}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => void generate()}
+                disabled={!name.trim() || loading}
+              >
+                <Icon name="key" size={13} />
+                {loading ? "Generating…" : "Generate key"}
               </button>
             </div>
           </>
@@ -97,7 +120,9 @@ export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCrea
               </div>
               <div className="callout">
                 <Icon name="warn" size={14} />
-                <div>Store this key securely — LocalLink only stores a hash and cannot recover it.</div>
+                <div>
+                  Store this key securely — LocalLink only stores a hash and cannot recover it.
+                </div>
               </div>
               <div style={{ marginTop: 16 }}>
                 <div className="field-label">Example request</div>
@@ -105,7 +130,9 @@ export function GenerateKeyModal({ open, resourceId, gatewayUrl, onClose, onCrea
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn btn-primary" onClick={close}>Done</button>
+              <button className="btn btn-primary" onClick={close}>
+                Done
+              </button>
             </div>
           </>
         )}

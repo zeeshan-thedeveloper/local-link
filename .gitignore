@@ -10,19 +10,20 @@ coverage
 *.tsbuildinfo
 prisma/dev.db
 
-# Local-only tunnel client — not for committing
-packages/client/
+# Local tunnel client build output
+packages/client/dist/
+packages/client/.turbo/
 
-# Publishing guide — local reference only
+# Publishing guide - local reference only
 PUBLISHING.md
 
-# Deployment runbook — local reference only
+# Deployment runbook - local reference only
 DEPLOYMENT.md
 
-# Publication checklist — local reference only
+# Publication checklist - local reference only
 PUBLICATION_CHECKLIST.md
 
-# Local task files — agent work notes, not committed
+# Local task files - agent work notes, not committed
 tasks/
 
 # Local CI secrets (copy of .secrets.example with real values)
@@ -32,7 +33,7 @@ tasks/
 .actrc
 .npmrc
 
-# Design mockups — local only
+# Design mockups - local only
 desing/
 
 # IDE and AI assistant config

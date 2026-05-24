@@ -75,7 +75,7 @@ export function AppShell({
   const [user, setUser] = useState(currentUser);
   const [addOpen, setAddOpen] = useState(false);
   const [keyContext, setKeyContext] = useState<{
-    resourceId: string;
+    resource: { id: string; type: ResourceType; slug?: string };
     onCreated?: () => void;
   } | null>(null);
   const [connectHost, setConnectHost] = useState<{
@@ -87,8 +87,10 @@ export function AppShell({
   const overlayValue = useMemo(
     () => ({
       openAddResource: () => setAddOpen(true),
-      openGenerateKey: (resourceId: string, onCreated?: () => void) =>
-        setKeyContext({ resourceId, onCreated }),
+      openGenerateKey: (
+        resource: { id: string; type: ResourceType; slug?: string },
+        onCreated?: () => void,
+      ) => setKeyContext({ resource, onCreated }),
     }),
     [],
   );
@@ -200,7 +202,7 @@ export function AppShell({
         />
         <GenerateKeyModal
           open={Boolean(keyContext)}
-          resourceId={keyContext?.resourceId ?? null}
+          resource={keyContext?.resource ?? null}
           onClose={() => setKeyContext(null)}
           onCreated={() => {
             keyContext?.onCreated?.();
