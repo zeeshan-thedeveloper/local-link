@@ -1,6 +1,5 @@
 "use client";
 
-import { generateSlug } from "@locallink/shared";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
