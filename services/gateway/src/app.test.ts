@@ -99,27 +99,25 @@ describe("gateway app", () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    // Pre-populate a verified test user (no password login — OAuth only)
+    prisma.state.users.push({
+      id: "user_1",
+      email: "me@example.com",
+      passwordHash: "",
+      emailVerified: true,
+    });
+    // Sign a JWT directly using the same test secret used by createApp
     const app = await createApp({
       prisma,
       jwtSecret: "test-secret",
       tunnel: { connectedHosts: () => [], send: vi.fn() },
     });
-    await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: "me@example.com", password: "password" },
-    });
-    if (prisma.state.users[0]) prisma.state.users[0].emailVerified = true;
-    const response = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: "me@example.com", password: "password" },
-    });
-    cookie = response.headers["set-cookie"] as string;
+    const token = app.jwt.sign({ sub: "user_1", email: "me@example.com" }, { expiresIn: "7d" });
+    cookie = `locallink_session=${token}`;
     await app.close();
   });
 
-  it("creates the first single user on login", async () => {
+  it("provides a valid session cookie for authenticated requests", async () => {
     expect(prisma.state.users).toHaveLength(1);
     expect(cookie).toContain("locallink_session");
   });

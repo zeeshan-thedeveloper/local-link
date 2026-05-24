@@ -52,6 +52,7 @@ service-account*.json
 *.sqlite3
 *.dump
 *.sql
+!**/prisma/migrations/**/*.sql
 *.bak
 *.zip
 *.tar

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { BuildBadge } from "@/components/layout/BuildBadge";
-import { LoginForm } from "./LoginForm";
 import "./login.css";
 
 function oauthUrl(provider: "google" | "github"): string {
@@ -119,14 +118,7 @@ export default function LoginPage() {
               <span>// Sign in</span>
             </p>
             <h1 className="login-title">Sign in to your gateway</h1>
-            <p className="login-sub">
-              Continue to your single-user instance at{" "}
-              <span className="mono">gateway.kestrel.io</span>.
-            </p>
-
-            <LoginForm />
-
-            <div className="login-divider">OR</div>
+            <p className="login-sub">Sign in with your Google or GitHub account to continue.</p>
 
             <a
               href={oauthUrl("google")}
