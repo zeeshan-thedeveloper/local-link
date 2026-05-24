@@ -58,6 +58,11 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   });
   await app.register(healthRoutes, { prisma });
 
+  const subdomainResources = new WeakMap<
+    FastifyRequest,
+    { id: string; type: string; config: unknown }
+  >();
+
   app.addHook("onRequest", async (request, reply) => {
     const slug = extractSubdomainSlug(request.headers.host);
     if (!slug) return;
@@ -68,7 +73,14 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       return;
     }
 
-    await proxyResolvedResource(resource, request, reply, buildSubdomainTargetPath(request));
+    subdomainResources.set(request, resource);
+  });
+
+  app.addHook("preHandler", async (request, reply) => {
+    const resource = subdomainResources.get(request);
+    if (!resource) return;
+
+    return proxyResolvedResource(resource, request, reply, buildSubdomainTargetPath(request));
   });
 
   async function requireDashboardAuth(request: FastifyRequest, reply: FastifyReply) {

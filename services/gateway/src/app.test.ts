@@ -352,6 +352,50 @@ describe("gateway app", () => {
     delete process.env.GATEWAY_BASE_DOMAIN;
   });
 
+  it("forwards parsed request bodies through api subdomains", async () => {
+    process.env.GATEWAY_BASE_DOMAIN = "locallink.lvh.me:3001";
+    const send = vi.fn().mockResolvedValue({
+      statusCode: 201,
+      headers: { "content-type": "application/json" },
+      body: '{"ok":true}',
+    });
+    prisma.state.resources.push({
+      id: "res_api",
+      name: "Public API",
+      slug: "public-api",
+      type: "api",
+      hostId: "host_1",
+      active: true,
+      config: { url: "http://localhost:8080", publicAccess: true },
+    });
+
+    const app = await createApp({
+      prisma,
+      jwtSecret: "test-secret",
+      tunnel: { connectedHosts: () => [], send },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/users",
+      headers: { host: "public-api.locallink.lvh.me:3001" },
+      payload: { name: "Ada" },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(send).toHaveBeenCalledWith(
+      "res_api",
+      expect.objectContaining({
+        resourceId: "res_api",
+        method: "POST",
+        path: "/users",
+        body: '{"name":"Ada"}',
+      }),
+    );
+    await app.close();
+    delete process.env.GATEWAY_BASE_DOMAIN;
+  });
+
   it("rewrites root-absolute asset paths in proxied HTML", async () => {
     const send = vi.fn().mockResolvedValue({
       statusCode: 200,
