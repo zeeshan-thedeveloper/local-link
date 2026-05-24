@@ -5,22 +5,14 @@ import { notifyCurrentUserUpdated } from "@/components/layout/AppShell";
 import { Icon } from "@/components/ui/Icon";
 import { StatusPill } from "@/components/ui/StatusPill";
 
-const gatewayUrl =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:3003";
-
-async function fetchGateway<T>(
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  const res = await fetch(`${gatewayUrl}${path}`, {
+async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
     credentials: "include",
     headers: {
       "content-type": "application/json",
-      ...((init.headers as Record<string, string>) ?? {})
+      ...((init.headers as Record<string, string>) ?? {}),
     },
-    ...init
+    ...init,
   });
 
   if (!res.ok) {
@@ -38,7 +30,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchGateway<{ user: { email: string; name?: string } }>("/auth/me")
+    fetchJson<{ user: { email: string; name?: string } }>("/api/auth/me")
       .then(({ user }) => {
         setEmail(user.email ?? "");
         setDisplayName(user.name ?? user.email?.split("@")[0] ?? "");
@@ -52,16 +44,18 @@ export default function SettingsPage() {
     setSaved(false);
 
     try {
-      const { user } = await fetchGateway<{
+      const nextName = displayName.trim();
+      const { user } = await fetchJson<{
         user: { id?: string; sub?: string; email: string; name?: string | null };
-      }>("/auth/me", {
+      }>("/api/auth/me", {
         method: "PATCH",
-        body: JSON.stringify({ name: displayName })
+        body: JSON.stringify({ name: nextName }),
       });
+      setDisplayName(user.name ?? nextName);
       notifyCurrentUserUpdated({
         id: user.sub ?? user.id ?? "",
         email: user.email,
-        name: user.name
+        name: user.name,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -87,9 +81,7 @@ export default function SettingsPage() {
             <div className="section-head">
               <div>
                 <h3 className="section-title">Account</h3>
-                <p className="section-sub">
-                  Personal account - single user workspace
-                </p>
+                <p className="section-sub">Personal account - single user workspace</p>
               </div>
             </div>
             <div style={{ padding: 22, display: "grid", gap: 16 }}>
@@ -97,7 +89,7 @@ export default function SettingsPage() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: 16
+                  gap: 16,
                 }}
               >
                 <div className="field" style={{ margin: 0 }}>
@@ -108,9 +100,7 @@ export default function SettingsPage() {
                     readOnly
                     style={{ color: "var(--text-2)" }}
                   />
-                  <div className="field-help">
-                    Account email cannot be changed.
-                  </div>
+                  <div className="field-help">Account email cannot be changed.</div>
                 </div>
                 <div className="field" style={{ margin: 0 }}>
                   <div className="field-label">Display name</div>
@@ -152,17 +142,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="section danger-zone">
-            <div
-              className="section-head"
-              style={{ borderBottomColor: "rgba(239,68,68,0.15)" }}
-            >
+            <div className="section-head" style={{ borderBottomColor: "rgba(239,68,68,0.15)" }}>
               <div>
                 <h3 className="section-title" style={{ color: "#fca5a5" }}>
                   Danger zone
                 </h3>
-                <p className="section-sub">
-                  Destructive actions - cannot be undone
-                </p>
+                <p className="section-sub">Destructive actions - cannot be undone</p>
               </div>
             </div>
             <div
@@ -171,7 +156,7 @@ export default function SettingsPage() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                gap: 16
+                gap: 16,
               }}
             >
               <div>
@@ -179,7 +164,7 @@ export default function SettingsPage() {
                   style={{
                     fontSize: 13,
                     fontWeight: 500,
-                    color: "var(--text-0)"
+                    color: "var(--text-0)",
                   }}
                 >
                   Delete account
@@ -188,11 +173,11 @@ export default function SettingsPage() {
                   style={{
                     fontSize: 12.5,
                     color: "var(--text-2)",
-                    marginTop: 2
+                    marginTop: 2,
                   }}
                 >
-                  Permanently delete your account, all resources, and all logs.
-                  This cannot be undone.
+                  Permanently delete your account, all resources, and all logs. This cannot be
+                  undone.
                 </div>
               </div>
               <button className="btn btn-danger">
@@ -207,9 +192,7 @@ export default function SettingsPage() {
           <div className="section-head">
             <div>
               <h3 className="section-title">Host application</h3>
-              <p className="section-sub">
-                Connect this machine to tunnel local resources.
-              </p>
+              <p className="section-sub">Connect this machine to tunnel local resources.</p>
             </div>
             <StatusPill status="disconnected" />
           </div>
@@ -227,8 +210,8 @@ export default function SettingsPage() {
             <div className="callout">
               <Icon name="info" size={14} />
               <div>
-                No host is connected yet. Once the host app connects, resource
-                tunnels and request logs will appear.
+                No host is connected yet. Once the host app connects, resource tunnels and request
+                logs will appear.
               </div>
             </div>
           </div>
