@@ -68,6 +68,12 @@ export default function ResourceDetailPage() {
       .catch(() => {});
   };
 
+  const refreshHosts = () => {
+    fetchJson<{ hosts: HostStatus[] }>("/tunnel/status")
+      .then((data) => setHosts(data.hosts))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     void Promise.all([
       fetchJson<Resource & { type: ResourceType | "ai_model" | "http_api" | "web_app" }>(
@@ -92,6 +98,15 @@ export default function ResourceDetailPage() {
       setHosts(hosts);
     });
   }, [params.id]);
+
+  useEffect(() => {
+    const interval = window.setInterval(refreshHosts, 5_000);
+    window.addEventListener("focus", refreshHosts);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshHosts);
+    };
+  }, []);
 
   const handleLogPageChange = (newPage: number) => {
     fetchLogs(newPage);
@@ -285,7 +300,16 @@ export default function ResourceDetailPage() {
         <ConfigSection
           resource={resource}
           endpoint={endpoint}
+          host={host}
+          rotatedToken={rotatedToken}
           onSaved={(updated) => setResource(normalizeResource(updated))}
+          onRotate={async () => {
+            const rotated = await fetchJson<{ hostToken: string }>(
+              `/resources/${resource.id}/rotate-token`,
+              { method: "POST" },
+            );
+            setRotatedToken(rotated.hostToken);
+          }}
         />
       )}
     </div>
@@ -326,6 +350,35 @@ function ConnectSection({
     },
   ];
 
+  if (host) {
+    return (
+      <div className="section">
+        <div className="section-head">
+          <div>
+            <h3 className="section-title">Host connected</h3>
+            <p className="section-sub">This resource is online and ready to proxy requests.</p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <StatusPill status="connected" label="Online" />
+            <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+              Last seen {formatDate(host.lastSeen)}
+            </span>
+          </div>
+        </div>
+        <div style={{ padding: 18, display: "grid", gap: 14 }}>
+          <div className="code">
+            <span className="text">{endpoint}</span>
+            <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
+          </div>
+          <p className="field-help" style={{ margin: 0 }}>
+            Setup instructions are hidden while the host is online. Host token management is
+            available in Config.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="section">
       <div className="section-head">
@@ -336,15 +389,7 @@ function ConnectSection({
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <StatusPill
-            status={host ? "connected" : "disconnected"}
-            label={host ? "Online" : "Offline"}
-          />
-          {host && (
-            <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
-              Last seen {formatDate(host.lastSeen)}
-            </span>
-          )}
+          <StatusPill status="disconnected" label="Offline" />
         </div>
       </div>
       <div style={{ padding: 18, display: "grid", gap: 14 }}>
@@ -654,11 +699,17 @@ type AiConfig = { provider: string; baseUrl: string; model: string };
 function ConfigSection({
   resource,
   endpoint,
+  host,
+  rotatedToken,
   onSaved,
+  onRotate,
 }: {
   resource: Resource;
   endpoint: string;
+  host?: HostStatus;
+  rotatedToken: string | null;
   onSaved: (r: Resource) => void;
+  onRotate: () => Promise<void>;
 }) {
   const config = resource.config as DbConfig | HttpConfig | AiConfig | null | undefined;
   const isDb = resource.type === "database";
@@ -666,12 +717,12 @@ function ConfigSection({
     resource.type === "http-api" || resource.type === "web-app" || resource.type === "api";
   const canTogglePublicAccess = resource.type === "http-api" || resource.type === "api";
 
-  const [configTab, setConfigTab] = useState<"local" | "gateway">("local");
   const [slug, setSlug] = useState(resource.slug ?? "");
   const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
   const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
   const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
   const [show, setShow] = useState(false);
+  const [rotating, setRotating] = useState(false);
 
   useEffect(() => {
     const http = config as HttpConfig | undefined;
@@ -682,10 +733,29 @@ function ConfigSection({
     setSlug(resource.slug ?? "");
   }, [resource.id, resource.slug, resource.config, isHttp, config]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedSection, setSavedSection] = useState<"public" | "local" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const save = async () => {
+  const savePublicEndpoint = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      onSaved(updated);
+      setSavedSection("public");
+      setTimeout(() => setSavedSection(null), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveLocalSetup = async () => {
     setSaving(true);
     setError(null);
     try {
@@ -699,15 +769,27 @@ function ConfigSection({
       const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, config: newConfig }),
+        body: JSON.stringify({ config: newConfig }),
       });
       onSaved(updated);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setSavedSection("local");
+      setTimeout(() => setSavedSection(null), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const rotateToken = async () => {
+    setRotating(true);
+    setError(null);
+    try {
+      await onRotate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Token regeneration failed");
+    } finally {
+      setRotating(false);
     }
   };
 
@@ -716,170 +798,159 @@ function ConfigSection({
       <div className="section-head">
         <div>
           <h3 className="section-title">Configuration</h3>
-          <p className="section-sub">Update connection details for this resource</p>
+          <p className="section-sub">Manage the public endpoint and local proxy target</p>
         </div>
       </div>
-      <div className={styles.configLayout}>
-        <div className={styles.configNav}>
-          <button
-            className={`${styles.configNavItem} ${configTab === "local" ? styles.active : ""}`}
-            type="button"
-            onClick={() => setConfigTab("local")}
-          >
-            <Icon name="server" size={13} />
-            Local Setup
-          </button>
-          <button
-            className={`${styles.configNavItem} ${configTab === "gateway" ? styles.active : ""}`}
-            type="button"
-            onClick={() => setConfigTab("gateway")}
-          >
-            <Icon name="globe" size={13} />
-            Public URL
-          </button>
-        </div>
-
-        <div className={styles.configContent}>
-          {configTab === "local" ? (
-            <>
+      <div className={styles.configContent}>
+        <div className={`${styles.configGroup} ${styles.localSetup}`}>
+          <div className={styles.configGroupHead}>
+            <div>
               <h3>Local Setup</h3>
               <p>Configure which local address the host agent proxies to the gateway.</p>
+            </div>
+          </div>
 
-              {isDb && (
-                <div className="field">
-                  <div className="field-label">Connection string</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      className="input"
-                      type={show ? "text" : "password"}
-                      value={connStr}
-                      onChange={(e) => setConnStr(e.target.value)}
-                      placeholder="postgresql://user:password@localhost:5432/dbname"
-                      style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
-                    />
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      type="button"
-                      onClick={() => setShow((s) => !s)}
-                      style={{ flexShrink: 0 }}
-                    >
-                      {show ? "Hide" : "Show"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {isHttp && (
-                <div className="field">
-                  <div className="field-label">Local URL</div>
-                  <input
-                    className="input"
-                    type="text"
-                    value={httpUrl}
-                    onChange={(e) => setHttpUrl(e.target.value)}
-                    placeholder="http://localhost:3000"
-                  />
-                  <div className="field-help">
-                    The address where your local {resource.type === "web-app" ? "app" : "server"} is
-                    running.
-                  </div>
-                </div>
-              )}
-
-              <div className="field-help">
-                Changes take effect on the next request handled by the host.
-              </div>
-
-              {error && (
-                <div className="callout" style={{ color: "var(--red)" }}>
-                  <Icon name="warn" size={14} />
-                  {error}
-                </div>
-              )}
-
-              <div>
+          {isDb && (
+            <div className="field">
+              <div className="field-label">Connection string</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  className="input"
+                  type={show ? "text" : "password"}
+                  value={connStr}
+                  onChange={(e) => setConnStr(e.target.value)}
+                  placeholder="postgresql://user:password@localhost:5432/dbname"
+                  style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12.5 }}
+                />
                 <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => void save()}
-                  disabled={saving}
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  onClick={() => setShow((s) => !s)}
+                  style={{ flexShrink: 0 }}
                 >
-                  {saved ? (
-                    <>
-                      <Icon name="check" size={13} />
-                      Saved
-                    </>
-                  ) : saving ? (
-                    "Saving…"
-                  ) : (
-                    "Save changes"
-                  )}
+                  {show ? "Hide" : "Show"}
                 </button>
               </div>
-            </>
-          ) : null}
+            </div>
+          )}
 
-          {configTab === "gateway" ? (
-            <>
+          {isHttp && (
+            <div className="field">
+              <div className="field-label">Local URL</div>
+              <input
+                className="input"
+                type="text"
+                value={httpUrl}
+                onChange={(e) => setHttpUrl(e.target.value)}
+                placeholder="http://localhost:3000"
+              />
+              <div className="field-help">
+                The address where your local {resource.type === "web-app" ? "app" : "server"} is
+                running.
+              </div>
+            </div>
+          )}
+
+          <div className="field-help">
+            Changes take effect on the next request handled by the host.
+          </div>
+
+          {error && (
+            <div className="callout" style={{ color: "var(--red)" }}>
+              <Icon name="warn" size={14} />
+              {error}
+            </div>
+          )}
+
+          <div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => void saveLocalSetup()}
+              disabled={saving}
+            >
+              {savedSection === "local" ? (
+                <>
+                  <Icon name="check" size={13} />
+                  Saved
+                </>
+              ) : saving ? (
+                "Saving..."
+              ) : (
+                "Save changes"
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className={`${styles.configGroup} ${styles.publicEndpoint}`}>
+          <div className={styles.configGroupHead}>
+            <div>
               <h3>Public Endpoint</h3>
               <p>How external clients reach this resource on the internet.</p>
-              <div className="field">
-                <div className="field-label">Slug</div>
-                <input
-                  className="input mono"
-                  type="text"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="my-resource"
-                />
-                <div className="field-help">
-                  Used in your gateway URL:{" "}
-                  <span className="mono">
-                    {slug || "my-resource"}.{gatewayBaseDomain}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => void save()}
-                  disabled={saving}
-                >
-                  {saved ? (
-                    <>
-                      <Icon name="check" size={13} />
-                      Saved
-                    </>
-                  ) : saving ? (
-                    "Saving..."
-                  ) : (
-                    "Save changes"
-                  )}
-                </button>
-              </div>
-              <hr
-                style={{ border: "none", borderTop: "1px solid var(--border)", margin: "2px 0" }}
-              />
-              <div style={{ display: "grid", gap: 10 }}>
-                <InfoRow label="Gateway URL">
-                  <a
-                    href={endpoint}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mono"
-                    style={{
-                      fontSize: 12,
-                      color: "var(--accent)",
-                      wordBreak: "break-all",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    {endpoint}
-                    <Icon name="external" size={11} />
-                  </a>
-                  <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
-                </InfoRow>
+            </div>
+            <StatusPill
+              status={host ? "connected" : "disconnected"}
+              label={host ? "Online" : "Offline"}
+            />
+          </div>
+          <div className="field">
+            <div className="field-label">Slug</div>
+            <input
+              className="input mono"
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="my-resource"
+            />
+            <div className="field-help">
+              Used in your gateway URL:{" "}
+              <span className="mono">
+                {slug || "my-resource"}.{gatewayBaseDomain}
+              </span>
+            </div>
+          </div>
+          <div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => void savePublicEndpoint()}
+              disabled={saving}
+            >
+              {savedSection === "public" ? (
+                <>
+                  <Icon name="check" size={13} />
+                  Saved
+                </>
+              ) : saving ? (
+                "Saving..."
+              ) : (
+                "Save changes"
+              )}
+            </button>
+          </div>
+          <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "2px 0" }} />
+          <div style={{ display: "grid", gap: 10 }}>
+            <InfoRow label="Gateway URL">
+              <a
+                href={endpoint}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  color: "var(--accent)",
+                  wordBreak: "break-all",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {endpoint}
+                <Icon name="external" size={11} />
+              </a>
+              <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
+            </InfoRow>
+            {resource.type !== "web-app" ? (
+              <>
                 <InfoRow label="Resource ID">
                   <span className="mono" style={{ fontSize: 12 }}>
                     {resource.id}
@@ -889,41 +960,70 @@ function ConfigSection({
                 <InfoRow label="Type">
                   <TypeBadge type={resource.type} />
                 </InfoRow>
-              </div>
-              {canTogglePublicAccess && (
-                <div className="field" style={{ marginTop: 2 }}>
-                  <div className="field-label">Access</div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      padding: "12px 14px",
-                      gap: 12,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>Public access</div>
-                      <div className="field-help" style={{ margin: 0, marginTop: 2 }}>
-                        Allow browsers to open <span className="mono">{endpoint}</span> without an
-                        API key.
-                      </div>
-                    </div>
-                    <ToggleSwitch checked={publicAccess} onChange={setPublicAccess} />
+              </>
+            ) : null}
+          </div>
+          {canTogglePublicAccess && (
+            <div className="field" style={{ marginTop: 2 }}>
+              <div className="field-label">Access</div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "12px 14px",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>Public access</div>
+                  <div className="field-help" style={{ margin: 0, marginTop: 2 }}>
+                    Allow browsers to open <span className="mono">{endpoint}</span> without an API
+                    key.
                   </div>
                 </div>
-              )}
-              {resource.type === "web-app" ? (
-                <p className="field-help" style={{ marginTop: 12 }}>
-                  Web apps are public and use subdomain routing, so assets load without a path
-                  prefix.
-                </p>
-              ) : null}
-            </>
+                <ToggleSwitch checked={publicAccess} onChange={setPublicAccess} />
+              </div>
+            </div>
+          )}
+          {resource.type === "web-app" ? (
+            <p className="field-help" style={{ marginTop: 12 }}>
+              Web apps are public and use subdomain routing, so assets load without a path prefix.
+            </p>
           ) : null}
+        </div>
+
+        <div className={styles.configGroup}>
+          <div className={styles.configGroupHead}>
+            <div>
+              <h3>Host Token</h3>
+              <p>Regenerate the token used by a host agent to connect this resource.</p>
+            </div>
+          </div>
+          {rotatedToken ? (
+            <div className="key-reveal" style={{ margin: 0 }}>
+              <div className="text">{rotatedToken}</div>
+              <CopyBtn onCopy={() => void navigator.clipboard.writeText(rotatedToken)} />
+            </div>
+          ) : (
+            <p className="field-help" style={{ margin: 0 }}>
+              The original token was shown only once. Regenerating creates a new token and leaves
+              the resource available for a reconnect.
+            </p>
+          )}
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            onClick={() => void rotateToken()}
+            disabled={rotating}
+            style={{ justifySelf: "start" }}
+          >
+            <Icon name="refresh" size={13} />
+            {rotating ? "Regenerating..." : "Regenerate token"}
+          </button>
         </div>
       </div>
     </div>
