@@ -30,6 +30,7 @@ type UpdateCurrentUserBody = { name?: string };
 type ResourceParams = { id: string };
 type KeyParams = { id: string };
 type LogsQuery = { page?: string; limit?: string; resourceId?: string };
+type DashboardUser = { id: string; email: string; name: string | null };
 
 const sessionCookieName = "locallink_session";
 const cookieDomain = process.env.COOKIE_DOMAIN ?? undefined;
@@ -192,32 +193,39 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       }),
     );
 
+    const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
     const callbackStartedAt = oauthCallbackTimestamps.get(request);
-    let oauthSessionUser: { email: string; id: string } | undefined;
+    const setCookieHeaders = responseHeaders.getSetCookie?.() ?? [];
+    let oauthSessionUser: DashboardUser | undefined;
     if (callbackStartedAt !== undefined && response.status >= 300 && response.status < 400) {
-      const session = await prisma.session.findFirst({
-        where: { createdAt: { gte: callbackStartedAt } },
-        orderBy: { createdAt: "desc" },
-        include: { user: { select: { id: true, email: true } } },
-      });
+      const betterAuthSessionToken = getBetterAuthSessionToken(setCookieHeaders);
+      const session = betterAuthSessionToken
+        ? await prisma.session.findUnique({
+            where: { token: betterAuthSessionToken },
+            include: { user: { select: { id: true, email: true, name: true } } },
+          })
+        : await prisma.session.findFirst({
+            where: { createdAt: { gte: callbackStartedAt } },
+            orderBy: { createdAt: "desc" },
+            include: { user: { select: { id: true, email: true, name: true } } },
+          });
       if (session?.user) {
         oauthSessionUser = session.user;
       }
     }
 
     reply.status(response.status);
-    const responseHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
     responseHeaders.forEach((value, key) => {
       if (key.toLowerCase() !== "set-cookie") {
         reply.header(key, value);
       }
     });
-    for (const cookieHeader of responseHeaders.getSetCookie?.() ?? []) {
+    for (const cookieHeader of setCookieHeaders) {
       reply.header("set-cookie", cookieHeader);
     }
     if (oauthSessionUser) {
       const token = app.jwt.sign(
-        { sub: oauthSessionUser.id, email: oauthSessionUser.email },
+        { sub: oauthSessionUser.id, email: oauthSessionUser.email, name: oauthSessionUser.name },
         { expiresIn: "7d" },
       );
       reply.setCookie(sessionCookieName, token, {
@@ -281,7 +289,7 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
       domain: cookieDomain,
       maxAge: 60 * 60 * 24 * 7,
     });
-    return { user: { id: user.id, email: user.email }, token };
+    return { user: { id: user.id, email: user.email, name: user.name }, token };
   });
 
   app.post("/auth/logout", async (_request, reply) => {
@@ -685,6 +693,18 @@ function trimDots(value: string) {
   while (start < end && value[start] === ".") start += 1;
   while (end > start && value[end - 1] === ".") end -= 1;
   return value.slice(start, end);
+}
+
+function getBetterAuthSessionToken(setCookieHeaders: string[]) {
+  const sessionCookie = setCookieHeaders.find((header) =>
+    /^(__Secure-)?better-auth\.session_token=/i.test(header),
+  );
+  const encodedValue = sessionCookie?.match(
+    /^(__Secure-)?better-auth\.session_token=([^;]+)/i,
+  )?.[2];
+  if (!encodedValue) return null;
+
+  return decodeURIComponent(encodedValue).split(".")[0] || null;
 }
 
 function requiresApiKey(resource: { type: string; config: unknown }) {
