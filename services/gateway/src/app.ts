@@ -7,13 +7,10 @@ import {
   resourceUpdateSchema,
 } from "@locallink/validators";
 import type { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import { signJWT } from "better-auth/crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import { auth } from "./lib/auth.js";
-import { sendVerificationEmail } from "./lib/email.js";
 import { createApiKey, createHostToken, hashApiKey } from "./lib/keys.js";
 import type { TunnelBroker } from "./lib/tunnel.js";
 import { rewriteProxiedHttpResponse } from "./lib/proxy-rewrite.js";
@@ -25,7 +22,6 @@ type AppOptions = {
   jwtSecret: string;
 };
 
-type LoginBody = { email: string; password: string };
 type UpdateCurrentUserBody = { name?: string };
 type ResourceParams = { id: string };
 type KeyParams = { id: string };
@@ -100,19 +96,6 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     oauthCallbackTimestamps.set(request, new Date());
   });
 
-  async function sendDashboardVerificationEmail(email: string, request: FastifyRequest) {
-    const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
-    const frontendBaseUrl = process.env.FRONTEND_BASE_URL ?? "http://localhost:3000";
-    const secret = process.env.BETTER_AUTH_SECRET ?? "locallink-dev-secret";
-    const token = await signJWT({ email: email.toLowerCase() }, secret, 60 * 60 * 24);
-    const callbackURL = encodeURIComponent(`${frontendBaseUrl}/login?verified=1`);
-    await sendVerificationEmail(
-      email,
-      `${baseUrl}/api/auth/verify-email?token=${token}&callbackURL=${callbackURL}`,
-      request.log,
-    );
-  }
-
   app.get("/api/auth/google", async (_request, reply) => {
     const frontendBaseUrl = process.env.FRONTEND_BASE_URL ?? "http://localhost:3000";
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Redirecting...</title></head><body>
@@ -174,9 +157,6 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
   app.all("/api/auth/*", async (request, reply) => {
     const baseUrl = process.env.BACKEND_BASE_URL ?? `${request.protocol}://${request.headers.host}`;
     const url = new URL(request.raw.url ?? "/", baseUrl);
-    if (request.method === "POST" && url.pathname === "/api/auth/forget-password") {
-      url.pathname = "/api/auth/request-password-reset";
-    }
     const hasBody = request.method !== "GET" && request.method !== "HEAD";
     const body =
       hasBody && typeof request.body === "string"
@@ -239,57 +219,6 @@ export async function createApp({ prisma, tunnel, jwtSecret }: AppOptions) {
     }
 
     return reply.send(Buffer.from(await response.arrayBuffer()));
-  });
-
-  app.post<{ Body: LoginBody }>("/auth/login", async (request, reply) => {
-    const email = request.body.email.toLowerCase();
-    const password = request.body.password;
-    let user = await prisma.user.findUnique({ where: { email } });
-    const userCount = await prisma.user.count();
-
-    if (!user && userCount === 0) {
-      const passwordHash = await bcrypt.hash(password, 12);
-      user = await prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          accounts: {
-            create: {
-              accountId: email,
-              providerId: "credential",
-              password: passwordHash,
-            },
-          },
-        },
-      });
-      await sendDashboardVerificationEmail(user.email, request);
-    }
-
-    const credentialAccount = user
-      ? await prisma.account.findFirst({
-          where: { userId: user.id, providerId: "credential", password: { not: null } },
-          select: { password: true },
-        })
-      : null;
-    const storedPassword = credentialAccount?.password ?? user?.passwordHash;
-    if (!user || !storedPassword || !(await bcrypt.compare(password, storedPassword))) {
-      return reply.code(401).send({ error: "Invalid credentials" });
-    }
-    if (!user.emailVerified) {
-      await sendDashboardVerificationEmail(user.email, request);
-      return reply.code(403).send({ error: "Email verification required" });
-    }
-
-    const token = app.jwt.sign({ sub: user.id, email: user.email }, { expiresIn: "7d" });
-    reply.setCookie(sessionCookieName, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      domain: cookieDomain,
-      maxAge: 60 * 60 * 24 * 7,
-    });
-    return { user: { id: user.id, email: user.email, name: user.name }, token };
   });
 
   app.post("/auth/logout", async (_request, reply) => {

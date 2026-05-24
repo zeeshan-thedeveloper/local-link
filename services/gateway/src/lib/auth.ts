@@ -1,7 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
-import bcrypt from "bcryptjs";
-import { sendPasswordResetEmail, sendVerificationEmail } from "./email.js";
+import { sendVerificationEmail } from "./email.js";
 import { prisma } from "./prisma.js";
 
 export const auth = betterAuth({
@@ -29,17 +28,6 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24,
     async sendVerificationEmail({ user, url }) {
       await sendVerificationEmail(user.email, url);
-    },
-  },
-  emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: true,
-    async sendResetPassword({ user, url }) {
-      await sendPasswordResetEmail(user.email, url);
-    },
-    password: {
-      hash: (password) => bcrypt.hash(password, 12),
-      verify: ({ hash, password }) => bcrypt.compare(password, hash),
     },
   },
 });
