@@ -279,13 +279,7 @@ export default function ResourceDetailPage() {
           host={host}
           rotatedToken={rotatedToken}
           onOpenKeys={() => setTab("keys")}
-          onRotate={async () => {
-            const rotated = await fetchJson<{ hostToken: string }>(
-              `/resources/${resource.id}/rotate-token`,
-              { method: "POST" },
-            );
-            setRotatedToken(rotated.hostToken);
-          }}
+          onOpenConfig={() => setTab("config")}
         />
       )}
       {tab === "keys" && resource.type !== "web-app" && (
@@ -322,16 +316,16 @@ function ConnectSection({
   host,
   rotatedToken,
   onOpenKeys,
-  onRotate,
+  onOpenConfig,
 }: {
   resource: Resource;
   endpoint: string;
   host?: HostStatus;
   rotatedToken: string | null;
   onOpenKeys: () => void;
-  onRotate: () => Promise<void>;
+  onOpenConfig: () => void;
 }) {
-  const tokenArg = rotatedToken ?? "<regenerated token>";
+  const tokenArg = rotatedToken ?? "<host token from Config>";
   const setupSteps = [
     {
       number: 1,
@@ -444,18 +438,23 @@ function ConnectSection({
           </div>
         )}
         <p className="field-help" style={{ margin: 0 }}>
-          The original token was shown only once. Regenerate a token here when you need to connect
-          this resource again.
+          The original token is shown only once. Generate a replacement in the{" "}
+          <button
+            type="button"
+            onClick={onOpenConfig}
+            style={{
+              background: "transparent",
+              border: 0,
+              color: "var(--accent)",
+              cursor: "pointer",
+              font: "inherit",
+              padding: 0,
+            }}
+          >
+            Config
+          </button>{" "}
+          tab when you need to connect this resource again.
         </p>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() => void onRotate()}
-          style={{ justifySelf: "start" }}
-        >
-          <Icon name="refresh" size={13} />
-          Regenerate token
-        </button>
       </div>
     </div>
   );
