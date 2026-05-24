@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOverlays } from "@/components/overlays/OverlayContext";
+import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { resourceEndpoint } from "@/lib/resource-url";
 import type { ApiKey, RequestLog, Resource, ResourceType } from "@/lib/types";
@@ -97,6 +99,11 @@ export default function ResourceDetailPage() {
 
   const host = useMemo(() => hosts.find((item) => item.id === resource?.id), [hosts, resource?.id]);
 
+  useEffect(() => {
+    if (!resource) return;
+    if (!host) setTab("connect");
+  }, [resource?.id]);
+
   if (!resource) {
     return (
       <div className="page">
@@ -114,6 +121,15 @@ export default function ResourceDetailPage() {
   }
 
   const endpoint = resourceEndpoint(resource, gatewayUrl);
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "connect", label: "Connect" },
+    ...(resource.type !== "web-app"
+      ? [{ id: "keys" as Tab, label: `API Keys - ${keys.length}` }]
+      : []),
+    { id: "logs", label: "Logs" },
+    { id: "config", label: "Config" },
+  ];
 
   return (
     <div className="page">
@@ -154,17 +170,11 @@ export default function ResourceDetailPage() {
         </div>
 
         <div className="tabs">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "connect", label: "Connect" },
-            { id: "keys", label: `API Keys - ${keys.length}` },
-            { id: "logs", label: "Logs" },
-            { id: "config", label: "Config" },
-          ].map((item) => (
+          {tabs.map((item) => (
             <button
               key={item.id}
               className={"tab " + (tab === item.id ? "active" : "")}
-              onClick={() => setTab(item.id as Tab)}
+              onClick={() => setTab(item.id)}
             >
               {item.label}
             </button>
@@ -193,14 +203,27 @@ export default function ResourceDetailPage() {
               </div>
               <div className="stat-delta">{host ? "Host heartbeat received" : "Host offline"}</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">
-                <Icon name="key" size={13} />
-                API keys
+            {resource.type === "web-app" ? (
+              <div className="stat-card">
+                <div className="stat-label">
+                  <Icon name="globe" size={13} />
+                  Access
+                </div>
+                <div className="stat-value" style={{ fontSize: 18 }}>
+                  Public
+                </div>
+                <div className="stat-delta">no API key required</div>
               </div>
-              <div className="stat-value">{keys.length}</div>
-              <div className="stat-delta">authorized tokens</div>
-            </div>
+            ) : (
+              <div className="stat-card">
+                <div className="stat-label">
+                  <Icon name="key" size={13} />
+                  API keys
+                </div>
+                <div className="stat-value">{keys.length}</div>
+                <div className="stat-delta">authorized tokens</div>
+              </div>
+            )}
             <div className="stat-card">
               <div className="stat-label">
                 <Icon name="resources" size={13} />
@@ -212,19 +235,24 @@ export default function ResourceDetailPage() {
               <div className="stat-delta">gateway routing</div>
             </div>
           </div>
-          <KeysSection
-            keys={keys}
-            onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)}
-            onRevokeKey={revokeKey}
-          />
+          {resource.type !== "web-app" && (
+            <KeysSection
+              keys={keys}
+              onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)}
+              onRevokeKey={revokeKey}
+            />
+          )}
           <RequestsTable logPage={logPage} onPageChange={handleLogPageChange} />
         </>
       )}
 
       {tab === "connect" && (
         <ConnectSection
+          resource={resource}
+          endpoint={endpoint}
           host={host}
           rotatedToken={rotatedToken}
+          onOpenKeys={() => setTab("keys")}
           onRotate={async () => {
             const rotated = await fetchJson<{ hostToken: string }>(
               `/resources/${resource.id}/rotate-token`,
@@ -234,7 +262,7 @@ export default function ResourceDetailPage() {
           }}
         />
       )}
-      {tab === "keys" && (
+      {tab === "keys" && resource.type !== "web-app" && (
         <KeysSection
           keys={keys}
           onGenerateKey={() => openGenerateKey(resource.id, refreshKeys)}
@@ -254,12 +282,18 @@ export default function ResourceDetailPage() {
 }
 
 function ConnectSection({
+  resource,
+  endpoint,
   host,
   rotatedToken,
+  onOpenKeys,
   onRotate,
 }: {
+  resource: Resource;
+  endpoint: string;
   host?: HostStatus;
   rotatedToken: string | null;
+  onOpenKeys: () => void;
   onRotate: () => Promise<void>;
 }) {
   const tokenArg = rotatedToken ?? "<regenerated token>";
@@ -285,21 +319,24 @@ function ConnectSection({
     <div className="section">
       <div className="section-head">
         <div>
-          <h3 className="section-title">Host connection</h3>
-          <p className="section-sub">Current status and setup commands for this resource.</p>
+          <h3 className="section-title">Connect host</h3>
+          <p className="section-sub">
+            Run these commands on the machine where your local resource is running.
+          </p>
         </div>
-        <StatusPill
-          status={host ? "connected" : "disconnected"}
-          label={host ? "Online" : "Offline"}
-        />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <StatusPill
+            status={host ? "connected" : "disconnected"}
+            label={host ? "Online" : "Offline"}
+          />
+          {host && (
+            <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+              Last seen {formatDate(host.lastSeen)}
+            </span>
+          )}
+        </div>
       </div>
       <div style={{ padding: 18, display: "grid", gap: 14 }}>
-        <dl className="kv-grid" style={{ margin: 0 }}>
-          <dt>Last seen</dt>
-          <dd>{host?.lastSeen ? formatDate(host.lastSeen) : "Never"}</dd>
-          <dt>Socket</dt>
-          <dd>{host?.socketId ?? "-"}</dd>
-        </dl>
         <div style={{ display: "grid", gap: 14 }}>
           {setupSteps.map((step) => (
             <CommandStep
@@ -310,6 +347,46 @@ function ConnectSection({
             />
           ))}
         </div>
+        {resource.type === "web-app" ? (
+          <div className="callout" style={{ gap: 8 }}>
+            <Icon name="globe" size={14} />
+            <span>
+              <strong>Web apps are public.</strong> Once connected, anyone can open{" "}
+              <a
+                href={endpoint}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mono"
+                style={{ color: "var(--accent)" }}
+              >
+                {endpoint}
+              </a>{" "}
+              in a browser - no API key needed.
+            </span>
+          </div>
+        ) : (
+          <div className="callout">
+            <Icon name="key" size={14} />
+            <span>
+              Requests require an API key. Generate one under the{" "}
+              <button
+                type="button"
+                onClick={onOpenKeys}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  font: "inherit",
+                  padding: 0,
+                }}
+              >
+                API Keys
+              </button>{" "}
+              tab.
+            </span>
+          </div>
+        )}
         <p className="field-help" style={{ margin: 0 }}>
           The original token was shown only once. Regenerate a token here when you need to connect
           this resource again.
@@ -639,7 +716,7 @@ function ConfigSection({
             onClick={() => setConfigTab("local")}
           >
             <Icon name="server" size={13} />
-            Local Match
+            Local Setup
           </button>
           <button
             className={`${styles.configNavItem} ${configTab === "gateway" ? styles.active : ""}`}
@@ -647,15 +724,15 @@ function ConfigSection({
             onClick={() => setConfigTab("gateway")}
           >
             <Icon name="globe" size={13} />
-            Gateway
+            Public URL
           </button>
         </div>
 
         <div className={styles.configContent}>
           {configTab === "local" ? (
             <>
-              <h3>Local Match Configuration</h3>
-              <p>Update how the host agent connects to your local resource.</p>
+              <h3>Local Setup</h3>
+              <p>Configure which local address the host agent proxies to the gateway.</p>
 
               {isDb && (
                 <div className="field">
@@ -682,41 +759,20 @@ function ConfigSection({
               )}
 
               {isHttp && (
-                <>
-                  {canTogglePublicAccess && (
-                    <div className="field">
-                      <div className="field-label">Local URL</div>
-                      <input
-                        className="input"
-                        type="text"
-                        value={httpUrl}
-                        onChange={(e) => setHttpUrl(e.target.value)}
-                        placeholder="http://localhost:25543"
-                      />
-                    </div>
-                  )}
-                  <div className="field">
-                    <label
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "flex-start",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={publicAccess}
-                        onChange={(e) => setPublicAccess(e.target.checked)}
-                        style={{ marginTop: 3 }}
-                      />
-                      <span>
-                        <strong>Public gateway URL</strong> — browser can open{" "}
-                        <span className="mono">{endpoint}</span> without an API key
-                      </span>
-                    </label>
+                <div className="field">
+                  <div className="field-label">Local URL</div>
+                  <input
+                    className="input"
+                    type="text"
+                    value={httpUrl}
+                    onChange={(e) => setHttpUrl(e.target.value)}
+                    placeholder="http://localhost:3000"
+                  />
+                  <div className="field-help">
+                    The address where your local {resource.type === "web-app" ? "app" : "server"} is
+                    running.
                   </div>
-                </>
+                </div>
               )}
 
               <div className="field-help">
@@ -753,8 +809,8 @@ function ConfigSection({
 
           {configTab === "gateway" ? (
             <>
-              <h3>Gateway Configuration</h3>
-              <p>Identifiers used by external clients to reach this resource.</p>
+              <h3>Public Endpoint</h3>
+              <p>How external clients reach this resource on the internet.</p>
               <div className="field">
                 <div className="field-label">Slug</div>
                 <input
@@ -764,21 +820,12 @@ function ConfigSection({
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="my-resource"
                 />
-                <div className="field-help">Use lowercase letters, numbers, and hyphens.</div>
+                <div className="field-help">
+                  Used in your gateway URL:{" "}
+                  <span className="mono">{slug || "my-resource"}.locallink.zeeshanahmed.app</span>
+                </div>
               </div>
-              <dl className="kv-grid" style={{ margin: 0 }}>
-                <dt>Resource ID</dt>
-                <dd className="mono" style={{ fontSize: 12 }}>
-                  {resource.id}
-                </dd>
-                <dt>Type</dt>
-                <dd>{resource.type}</dd>
-                <dt>Gateway URL</dt>
-                <dd className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
-                  {endpoint}
-                </dd>
-              </dl>
-              <div style={{ marginTop: 14 }}>
+              <div>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => void save()}
@@ -796,23 +843,66 @@ function ConfigSection({
                   )}
                 </button>
               </div>
-              {resource.type === "http-api" ? (
-                <p className="field-help" style={{ marginTop: 12 }}>
-                  {(config as HttpConfig)?.publicAccess ? (
-                    <>
-                      This local website is <strong>public</strong>: open the gateway URL in a
-                      browser while the host is connected. Use API keys only for scripted clients.
-                    </>
-                  ) : (
-                    <>
-                      Requests require an API key (
-                      <span className="mono">Authorization: Bearer …</span> or{" "}
-                      <span className="mono">x-api-key</span>). Enable &quot;Public gateway
-                      URL&quot; under Local Match to allow browser access.
-                    </>
-                  )}
-                </p>
-              ) : null}
+              <hr
+                style={{ border: "none", borderTop: "1px solid var(--border)", margin: "2px 0" }}
+              />
+              <div style={{ display: "grid", gap: 10 }}>
+                <InfoRow label="Gateway URL">
+                  <a
+                    href={endpoint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mono"
+                    style={{
+                      fontSize: 12,
+                      color: "var(--accent)",
+                      wordBreak: "break-all",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {endpoint}
+                    <Icon name="external" size={11} />
+                  </a>
+                  <CopyBtn onCopy={() => void navigator.clipboard.writeText(endpoint)} />
+                </InfoRow>
+                <InfoRow label="Resource ID">
+                  <span className="mono" style={{ fontSize: 12 }}>
+                    {resource.id}
+                  </span>
+                  <CopyBtn onCopy={() => void navigator.clipboard.writeText(resource.id)} />
+                </InfoRow>
+                <InfoRow label="Type">
+                  <TypeBadge type={resource.type} />
+                </InfoRow>
+              </div>
+              {canTogglePublicAccess && (
+                <div className="field" style={{ marginTop: 2 }}>
+                  <div className="field-label">Access</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "12px 14px",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>Public access</div>
+                      <div className="field-help" style={{ margin: 0, marginTop: 2 }}>
+                        Allow browsers to open <span className="mono">{endpoint}</span> without an
+                        API key.
+                      </div>
+                    </div>
+                    <ToggleSwitch checked={publicAccess} onChange={setPublicAccess} />
+                  </div>
+                </div>
+              )}
               {resource.type === "web-app" ? (
                 <p className="field-help" style={{ marginTop: 12 }}>
                   Web apps are public and use subdomain routing, so assets load without a path
@@ -822,6 +912,19 @@ function ConfigSection({
             </>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: 110, flexShrink: 0, color: "var(--text-3)", fontSize: 12.5 }}>
+        {label}
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        {children}
       </div>
     </div>
   );
