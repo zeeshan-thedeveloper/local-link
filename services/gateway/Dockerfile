@@ -16,20 +16,35 @@ FROM deps AS build
 COPY . .
 RUN pnpm --filter @locallink/gateway... build
 
+FROM build AS deploy
+RUN pnpm --filter @locallink/gateway --prod deploy /prod/gateway
+RUN rm -rf \
+    /prod/gateway/node_modules/.bin/esbuild \
+    /prod/gateway/node_modules/.pnpm/node_modules/.bin/esbuild \
+    /prod/gateway/node_modules/.pnpm/node_modules/@esbuild \
+    /prod/gateway/node_modules/.pnpm/node_modules/esbuild \
+    /prod/gateway/node_modules/.pnpm/@esbuild+* \
+    /prod/gateway/node_modules/.pnpm/esbuild@* \
+    /prod/gateway/node_modules/.pnpm/vite@* \
+    /prod/gateway/node_modules/.pnpm/vite-node@* \
+    /prod/gateway/node_modules/.pnpm/vitest@* \
+    /prod/gateway/node_modules/.pnpm/@vitest+* \
+    /prod/gateway/node_modules/.pnpm/node_modules/vite \
+    /prod/gateway/node_modules/.pnpm/node_modules/vite-node \
+    /prod/gateway/node_modules/.pnpm/node_modules/vitest \
+    /prod/gateway/node_modules/.pnpm/node_modules/@vitest
+
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 gateway
-COPY --from=build --chown=gateway:nodejs /app/node_modules ./node_modules
-COPY --from=build --chown=gateway:nodejs /app/packages ./packages
-COPY --from=build --chown=gateway:nodejs /app/services/gateway ./services/gateway
+COPY --from=deploy --chown=gateway:nodejs /prod/gateway ./
 # Wrapper so deploy can run `prisma migrate deploy` without pnpm workspace
 RUN PRISMA_JS="$(find /app/node_modules -path '*/prisma/build/index.js' | head -1)" && \
     printf '%s\n' '#!/bin/sh' "exec node \"$PRISMA_JS\" \"\$@\"" > /usr/local/bin/prisma && \
     chmod +x /usr/local/bin/prisma
-WORKDIR /app/services/gateway
 USER gateway
 EXPOSE 3003
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
