@@ -34,8 +34,8 @@ fi
 docker pull "$GATEWAY_IMAGE"
 
 # Run prisma directly — production image has no monorepo root for `pnpm --filter`
-docker run --rm --env-file "$ENV_FILE" -w /app/services/gateway "$GATEWAY_IMAGE" \
-  prisma migrate deploy
+docker run --rm --env-file "$ENV_FILE" -w /app "$GATEWAY_IMAGE" \
+  prisma migrate deploy --schema /app/prisma/schema.prisma
 
 export GATEWAY_IMAGE
 docker compose -f "$COMPOSE_FILE" pull gateway
