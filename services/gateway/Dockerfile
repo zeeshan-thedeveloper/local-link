@@ -18,6 +18,7 @@ RUN pnpm --filter @locallink/gateway... build
 
 FROM build AS deploy
 RUN pnpm --filter @locallink/gateway --prod deploy /prod/gateway
+RUN cp -R /app/services/gateway/prisma /prod/gateway/prisma
 RUN rm -rf \
     /prod/gateway/node_modules/.bin/esbuild \
     /prod/gateway/node_modules/.pnpm/node_modules/.bin/esbuild \
