@@ -4,7 +4,10 @@ services:
       target: deps
     command: >
       sh -c "pnpm install --shamefully-hoist &&
+      pnpm --filter @locallink/shared build &&
+      pnpm --filter @locallink/validators build &&
       pnpm --filter @locallink/gateway prisma:generate &&
+      pnpm -C services/gateway exec prisma migrate deploy &&
       pnpm --filter @locallink/gateway dev"
     volumes:
       - .:/app
@@ -19,7 +22,11 @@ services:
   web:
     build:
       target: deps
-    command: pnpm --filter @locallink/web dev
+    command: >
+      sh -c "pnpm install --shamefully-hoist &&
+      pnpm --filter @locallink/shared build &&
+      pnpm --filter @locallink/validators build &&
+      pnpm --filter @locallink/web dev"
     volumes:
       - .:/app
       - /app/node_modules
