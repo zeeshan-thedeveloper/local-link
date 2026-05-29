@@ -115,7 +115,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.3(@types/react@19.2.15)
 
-  examples/http:
+  examples/http-fe:
     dependencies:
       react:
         specifier: ^19.0.0
@@ -140,6 +140,28 @@ importers:
         specifier: ^6.0.7
         version: 6.4.2(@types/node@25.9.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
 
+  examples/http-node:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      express:
+        specifier: ^4.18.2
+        version: 4.22.2
+    devDependencies:
+      "@types/express":
+        specifier: ^4.17.21
+        version: 4.17.25
+      "@types/node":
+        specifier: ^22.0.0
+        version: 22.19.19
+      tsx:
+        specifier: ^4.7.0
+        version: 4.22.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   examples/local-db:
     dependencies:
       "@locallink/client":
@@ -155,6 +177,25 @@ importers:
       "@types/express":
         specifier: ^4.17.21
         version: 4.17.25
+      "@types/node":
+        specifier: ^22.0.0
+        version: 22.19.19
+      tsx:
+        specifier: ^4.7.0
+        version: 4.22.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  examples/sdk-examples:
+    dependencies:
+      "@locallink/client":
+        specifier: workspace:*
+        version: link:../../packages/client
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+    devDependencies:
       "@types/node":
         specifier: ^22.0.0
         version: 22.19.19
@@ -9736,6 +9777,7 @@ snapshots:
   "@types/node@25.9.1":
     dependencies:
       undici-types: 7.24.6
+    optional: true
 
   "@types/oracledb@6.5.2":
     dependencies:
@@ -9753,7 +9795,7 @@ snapshots:
 
   "@types/pg@8.20.0":
     dependencies:
-      "@types/node": 25.9.1
+      "@types/node": 22.19.19
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
@@ -12171,7 +12213,8 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici-types@7.24.6: {}
+  undici-types@7.24.6:
+    optional: true
 
   universalify@0.1.2: {}
 

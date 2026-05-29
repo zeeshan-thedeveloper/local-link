@@ -58,7 +58,9 @@ packages/
   tsconfig/     Shared TypeScript config
 examples/
   local-db/     Express API that queries a tunneled Postgres resource via @locallink/client
-  http/         Vite React app for end-to-end HTTP proxy testing
+  http-fe/      Vite React app for end-to-end HTTP proxy testing
+  http-node/    Express API for end-to-end HTTP proxy testing
+  sdk-examples/ Node scripts that test @locallink/client against a gateway
 ```
 
 ---

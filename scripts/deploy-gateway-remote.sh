@@ -31,6 +31,11 @@ if [ -n "$PREV_CONTAINER" ]; then
   echo "Previous image: $PREV_IMAGE"
 fi
 
+echo "Cleaning up unused Docker resources before pull"
+docker container prune -f || true
+docker image prune -af --filter "until=24h" || true
+docker builder prune -af --filter "until=24h" || true
+
 docker pull "$GATEWAY_IMAGE"
 
 # Run prisma directly — production image has no monorepo root for `pnpm --filter`
@@ -46,6 +51,7 @@ for attempt in $(seq 1 12); do
     echo "Gateway healthy"
     docker compose -f "$COMPOSE_FILE" ps
     docker inspect --format='{{.Config.Image}}' "$(docker compose -f "$COMPOSE_FILE" ps -q gateway)" || true
+    docker image prune -af --filter "until=24h" || true
     exit 0
   fi
   echo "Waiting for health... attempt $attempt/12"
