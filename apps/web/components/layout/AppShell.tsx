@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AddResourceSlideOver } from "@/components/overlays/AddResourceSlideOver";
 import { ConnectHostModal } from "@/components/overlays/ConnectHostModal";
 import { GenerateKeyModal } from "@/components/overlays/GenerateKeyModal";
+import type { GeneratedApiKey } from "@/components/overlays/OverlayContext";
 import { OverlayContextProvider } from "@/components/overlays/OverlayContext";
 import type { CurrentUser } from "@/lib/gateway";
 import type { ResourceType } from "@/lib/types";
@@ -76,7 +77,7 @@ export function AppShell({
   const [addOpen, setAddOpen] = useState(false);
   const [keyContext, setKeyContext] = useState<{
     resource: { id: string; type: ResourceType; slug?: string };
-    onCreated?: () => void;
+    onCreated?: (created: GeneratedApiKey) => void;
   } | null>(null);
   const [connectHost, setConnectHost] = useState<{
     resource: { id: string; name: string; type: ResourceType };
@@ -89,7 +90,7 @@ export function AppShell({
       openAddResource: () => setAddOpen(true),
       openGenerateKey: (
         resource: { id: string; type: ResourceType; slug?: string },
-        onCreated?: () => void,
+        onCreated?: (created: GeneratedApiKey) => void,
       ) => setKeyContext({ resource, onCreated }),
     }),
     [],
@@ -204,8 +205,8 @@ export function AppShell({
           open={Boolean(keyContext)}
           resource={keyContext?.resource ?? null}
           onClose={() => setKeyContext(null)}
-          onCreated={() => {
-            keyContext?.onCreated?.();
+          onCreated={(created) => {
+            keyContext?.onCreated?.(created);
             showToast("API key created");
           }}
           gatewayUrl={gatewayUrl}

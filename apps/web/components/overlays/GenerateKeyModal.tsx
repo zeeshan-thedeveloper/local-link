@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
+import type { GeneratedApiKey } from "@/components/overlays/OverlayContext";
 import { resourceEndpoint } from "@/lib/resource-url";
-import type { ResourceType } from "@/lib/types";
+import type { ApiKey, ResourceType } from "@/lib/types";
 
 type Props = {
   open: boolean;
   resource: { id: string; type: ResourceType; slug?: string } | null;
   gatewayUrl: string;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (created: GeneratedApiKey) => void;
 };
 
 export function GenerateKeyModal({ open, resource, gatewayUrl, onClose, onCreated }: Props) {
@@ -40,9 +41,9 @@ export function GenerateKeyModal({ open, resource, gatewayUrl, onClose, onCreate
         body: JSON.stringify({ name: name.trim() }),
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      const data = (await res.json()) as { key: string };
+      const data = (await res.json()) as { apiKey: ApiKey; key: string };
       setCreatedKey(data.key);
-      onCreated();
+      onCreated(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

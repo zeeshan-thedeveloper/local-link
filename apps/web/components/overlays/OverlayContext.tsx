@@ -1,13 +1,17 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { ResourceType } from "@/lib/types";
+import type { ApiKey, ResourceType } from "@/lib/types";
 
 type GenerateKeyResource = { id: string; type: ResourceType; slug?: string };
+export type GeneratedApiKey = { apiKey: ApiKey; key: string };
 
 export interface OverlayContextValue {
   openAddResource: () => void;
-  openGenerateKey: (resource: GenerateKeyResource, onCreated?: () => void) => void;
+  openGenerateKey: (
+    resource: GenerateKeyResource,
+    onCreated?: (created: GeneratedApiKey) => void,
+  ) => void;
 }
 
 const OverlayContext = createContext<OverlayContextValue | null>(null);

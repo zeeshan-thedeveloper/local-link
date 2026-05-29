@@ -1187,7 +1187,8 @@ input, textarea, select { font-family: inherit; }
 
   --green-soft: rgba(22,163,74,0.10);
   --red-soft: rgba(220,38,38,0.10);
-  --yellow-soft: rgba(202,138,4,0.10);
+  --yellow: #2563eb;
+  --yellow-soft: rgba(37,99,235,0.10);
   --purple-soft: rgba(124,58,237,0.10);
 }
 
@@ -1236,6 +1237,36 @@ input, textarea, select { font-family: inherit; }
 
 [data-theme="light"] .scrim {
   background: rgba(0,0,0,0.3);
+}
+
+[data-theme="light"] .pill.yellow {
+  background: rgba(37,99,235,0.10);
+  border-color: rgba(37,99,235,0.24);
+  color: #1d4ed8;
+}
+[data-theme="light"] .pill.yellow .dot {
+  background: #2563eb;
+}
+
+[data-theme="light"] .banner.warn {
+  border-color: rgba(37,99,235,0.24);
+  background: linear-gradient(180deg, rgba(37,99,235,0.04), transparent), #ffffff;
+}
+
+[data-theme="light"] .callout {
+  background: rgba(37,99,235,0.06);
+  border-color: rgba(37,99,235,0.18);
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .sc-4xx {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .method-PUT,
+[data-theme="light"] .method-PATCH {
+  background: rgba(37,99,235,0.10);
+  color: #1d4ed8;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb {

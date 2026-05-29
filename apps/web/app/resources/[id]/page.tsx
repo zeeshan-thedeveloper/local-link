@@ -7,7 +7,6 @@ import { CopyBtn } from "@/components/ui/CopyBtn";
 import { Icon } from "@/components/ui/Icon";
 import { ResIcon } from "@/components/ui/ResIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TypeBadge } from "@/components/ui/TypeBadge";
 import { gatewayBaseDomain, resourceEndpoint } from "@/lib/resource-url";
 import { generateSlug } from "@/lib/slug";
@@ -27,6 +26,7 @@ type GatewayRequestLog = Partial<RequestLog> & {
   createdAt: string;
 };
 type LogPage = { items: RequestLog[]; page: number; limit: number; total: number };
+type ApiKeyRow = ApiKey & { key?: string };
 
 const gatewayUrl =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
@@ -36,17 +36,30 @@ export default function ResourceDetailPage() {
   const router = useRouter();
   const { openGenerateKey } = useOverlays();
   const [resource, setResource] = useState<Resource | null>(null);
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [logPage, setLogPage] = useState<LogPage>({ items: [], page: 1, limit: 10, total: 0 });
   const [hosts, setHosts] = useState<HostStatus[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
-  const [rotatedToken, setRotatedToken] = useState<string | null>(null);
   const logLimit = 10;
 
   const refreshKeys = () => {
     fetchJson<ApiKey[]>(`/resources/${params.id}/keys`)
-      .then(setKeys)
+      .then((freshKeys) =>
+        setKeys((currentKeys) =>
+          freshKeys.map((key) => {
+            const current = currentKeys.find((item) => item.id === key.id);
+            return current?.key ? { ...key, key: current.key } : key;
+          }),
+        ),
+      )
       .catch(() => {});
+  };
+
+  const handleKeyCreated = ({ apiKey, key }: { apiKey: ApiKey; key: string }) => {
+    setKeys((currentKeys) => [
+      { ...apiKey, key },
+      ...currentKeys.filter((item) => item.id !== apiKey.id),
+    ]);
   };
 
   const revokeKey = (keyId: string) => {
@@ -266,7 +279,7 @@ export default function ResourceDetailPage() {
           {resource.type !== "web-app" && (
             <KeysSection
               keys={keys}
-              onGenerateKey={() => openGenerateKey(resource, refreshKeys)}
+              onGenerateKey={() => openGenerateKey(resource, handleKeyCreated)}
               onRevokeKey={revokeKey}
             />
           )}
@@ -280,7 +293,6 @@ export default function ResourceDetailPage() {
           endpoint={endpoint}
           host={host}
           keys={keys}
-          rotatedToken={rotatedToken}
           onOpenKeys={() => setTab("keys")}
           onOpenConfig={() => setTab("config")}
         />
@@ -288,7 +300,7 @@ export default function ResourceDetailPage() {
       {tab === "keys" && resource.type !== "web-app" && (
         <KeysSection
           keys={keys}
-          onGenerateKey={() => openGenerateKey(resource, refreshKeys)}
+          onGenerateKey={() => openGenerateKey(resource, handleKeyCreated)}
           onRevokeKey={revokeKey}
         />
       )}
@@ -298,15 +310,7 @@ export default function ResourceDetailPage() {
           resource={resource}
           endpoint={endpoint}
           host={host}
-          rotatedToken={rotatedToken}
           onSaved={(updated) => setResource(normalizeResource(updated))}
-          onRotate={async () => {
-            const rotated = await fetchJson<{ hostToken: string }>(
-              `/resources/${resource.id}/rotate-token`,
-              { method: "POST" },
-            );
-            setRotatedToken(rotated.hostToken);
-          }}
         />
       )}
     </div>
@@ -318,7 +322,6 @@ function ConnectSection({
   endpoint,
   host,
   keys,
-  rotatedToken,
   onOpenKeys,
   onOpenConfig,
 }: {
@@ -326,11 +329,10 @@ function ConnectSection({
   endpoint: string;
   host?: HostStatus;
   keys: ApiKey[];
-  rotatedToken: string | null;
   onOpenKeys: () => void;
   onOpenConfig: () => void;
 }) {
-  const tokenArg = rotatedToken ?? "<host token from Config>";
+  const tokenArg = "<host token from resource creation>";
   const setupSteps = [
     {
       number: 1,
@@ -524,7 +526,7 @@ function CallThisApiSection({
         {publicAccess ? (
           <div className="callout" style={{ gap: 8 }}>
             <Icon name="globe" size={14} />
-            <span>Public access is enabled - no key required. Manage this in Config.</span>
+            <span>Public access is enabled - no key required.</span>
           </div>
         ) : (
           <>
@@ -693,7 +695,7 @@ function KeysSection({
   onGenerateKey,
   onRevokeKey,
 }: {
-  keys: ApiKey[];
+  keys: ApiKeyRow[];
   onGenerateKey: () => void;
   onRevokeKey: (id: string) => void;
 }) {
@@ -722,6 +724,7 @@ function KeysSection({
         <thead>
           <tr>
             <th>Name</th>
+            <th>Token</th>
             <th>Prefix</th>
             <th>Created</th>
             <th>Last used</th>
@@ -733,6 +736,37 @@ function KeysSection({
             keys.map((key) => (
               <tr key={key.id ?? key.name}>
                 <td style={{ fontWeight: 500 }}>{key.name}</td>
+                <td>
+                  {key.key ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        minWidth: 0,
+                        maxWidth: 420,
+                      }}
+                    >
+                      <span
+                        className="mono"
+                        style={{
+                          color: "var(--text-0)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={key.key}
+                      >
+                        {key.key}
+                      </span>
+                      <CopyBtn onCopy={() => void navigator.clipboard.writeText(key.key!)} />
+                    </div>
+                  ) : (
+                    <span style={{ color: "var(--text-3)", fontSize: 12.5 }}>
+                      Only shown at creation
+                    </span>
+                  )}
+                </td>
                 <td>
                   <span className="mono" style={{ fontSize: 12.5, color: "var(--text-2)" }}>
                     {key.prefix}
@@ -760,7 +794,7 @@ function KeysSection({
             ))
           ) : (
             <tr>
-              <td colSpan={5}>
+              <td colSpan={6}>
                 <div className="empty">
                   <div className="title">No API keys</div>
                   <div className="sub">Generate a key to start making requests.</div>
@@ -898,29 +932,22 @@ function ConfigSection({
   resource,
   endpoint,
   host,
-  rotatedToken,
   onSaved,
-  onRotate,
 }: {
   resource: Resource;
   endpoint: string;
   host?: HostStatus;
-  rotatedToken: string | null;
   onSaved: (r: Resource) => void;
-  onRotate: () => Promise<void>;
 }) {
   const config = resource.config as DbConfig | HttpConfig | AiConfig | null | undefined;
   const isDb = resource.type === "database";
   const isHttp =
     resource.type === "http-api" || resource.type === "web-app" || resource.type === "api";
-  const canTogglePublicAccess = resource.type === "http-api" || resource.type === "api";
 
   const [slug, setSlug] = useState(resource.slug ?? "");
   const [connStr, setConnStr] = useState((config as DbConfig)?.connectionString ?? "");
   const [httpUrl, setHttpUrl] = useState((config as HttpConfig)?.url ?? "");
-  const [publicAccess, setPublicAccess] = useState((config as HttpConfig)?.publicAccess ?? false);
   const [show, setShow] = useState(false);
-  const [rotating, setRotating] = useState(false);
   const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
 
@@ -928,7 +955,6 @@ function ConfigSection({
     const http = config as HttpConfig | undefined;
     if (isHttp && http) {
       setHttpUrl(http.url ?? "");
-      setPublicAccess(http.publicAccess ?? false);
     }
     setSlug(resource.slug ?? "");
   }, [resource.id, resource.slug, resource.config, isHttp, config]);
@@ -1006,9 +1032,7 @@ function ConfigSection({
       const newConfig = isDb
         ? { engine: (config as DbConfig)?.engine ?? "postgres", connectionString: connStr }
         : isHttp
-          ? resource.type === "web-app"
-            ? { url: httpUrl }
-            : { url: httpUrl, publicAccess }
+          ? { url: httpUrl }
           : config;
       const updated = await fetchJson<Resource>(`/resources/${resource.id}`, {
         method: "PATCH",
@@ -1022,18 +1046,6 @@ function ConfigSection({
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const rotateToken = async () => {
-    setRotating(true);
-    setError(null);
-    try {
-      await onRotate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Token regeneration failed");
-    } finally {
-      setRotating(false);
     }
   };
 
@@ -1213,67 +1225,11 @@ function ConfigSection({
               </>
             ) : null}
           </div>
-          {canTogglePublicAccess && (
-            <div className="field" style={{ marginTop: 2 }}>
-              <div className="field-label">Access</div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "var(--bg-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  padding: "12px 14px",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>Public access</div>
-                  <div className="field-help" style={{ margin: 0, marginTop: 2 }}>
-                    Allow browsers to open <span className="mono">{endpoint}</span> without an API
-                    key.
-                  </div>
-                </div>
-                <ToggleSwitch checked={publicAccess} onChange={setPublicAccess} />
-              </div>
-            </div>
-          )}
           {resource.type === "web-app" ? (
             <p className="field-help" style={{ marginTop: 12 }}>
               Web apps are public and use subdomain routing, so assets load without a path prefix.
             </p>
           ) : null}
-        </div>
-
-        <div className={styles.configGroup}>
-          <div className={styles.configGroupHead}>
-            <div>
-              <h3>Host Token</h3>
-              <p>Regenerate the token used by a host agent to connect this resource.</p>
-            </div>
-          </div>
-          {rotatedToken ? (
-            <div className="key-reveal" style={{ margin: 0 }}>
-              <div className="text">{rotatedToken}</div>
-              <CopyBtn onCopy={() => void navigator.clipboard.writeText(rotatedToken)} />
-            </div>
-          ) : (
-            <p className="field-help" style={{ margin: 0 }}>
-              The original token was shown only once. Regenerating creates a new token and leaves
-              the resource available for a reconnect.
-            </p>
-          )}
-          <button
-            className="btn btn-secondary btn-sm"
-            type="button"
-            onClick={() => void rotateToken()}
-            disabled={rotating}
-            style={{ justifySelf: "start" }}
-          >
-            <Icon name="refresh" size={13} />
-            {rotating ? "Regenerating..." : "Regenerate token"}
-          </button>
         </div>
       </div>
     </div>
