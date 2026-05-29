@@ -15,12 +15,22 @@ const api = createClient({
   apiKey,
 });
 
-const res = await api.get("/users");
+const usersRes = await api.get("/api/users");
 
-if (!res.ok) {
-  const body = await res.text();
-  throw new Error(`GET /users failed with ${res.status} ${res.statusText}: ${body}`);
+if (!usersRes.ok) {
+  const body = await usersRes.text();
+  throw new Error(`GET /api/users failed with ${usersRes.status} ${usersRes.statusText}: ${body}`);
 }
 
-const data = await res.json();
-console.log(JSON.stringify(data, null, 2));
+const users = await usersRes.json();
+console.log(JSON.stringify(users, null, 2));
+
+const healthRes = await api.get("/health");
+
+if (!healthRes.ok) {
+  const body = await healthRes.text();
+  throw new Error(`GET /health failed with ${healthRes.status} ${healthRes.statusText}: ${body}`);
+}
+
+const health = await healthRes.json();
+console.log(JSON.stringify(health, null, 2));
