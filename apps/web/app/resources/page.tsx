@@ -29,8 +29,6 @@ export default function ResourcesPage() {
     { id: "web-app", label: "Web apps" },
     { id: "api", label: "APIs" },
     { id: "database", label: "Databases" },
-    { id: "ai-model", label: "AI models" },
-    { id: "http-api", label: "Legacy HTTP" },
   ];
   const items = useMemo(() => {
     const filteredByType =

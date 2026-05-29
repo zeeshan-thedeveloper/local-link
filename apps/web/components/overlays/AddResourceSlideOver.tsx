@@ -51,7 +51,6 @@ export function AddResourceSlideOver({
     { id: "web-app", name: "Web App", desc: "Connect a React, Vite, or Next.js app" },
     { id: "api", name: "API", desc: "Connect a Node.js, Express, or FastAPI backend" },
     { id: "database", name: "Database", desc: "Postgres query endpoint" },
-    { id: "ai-model", name: "AI Model", desc: "Connect an Ollama or OpenAI-compatible model" },
   ];
 
   useEffect(() => {
@@ -127,15 +126,9 @@ export function AddResourceSlideOver({
                   localUrl ||
                   "postgresql://locallink:locallink@localhost:5433/locallink",
               }
-            : type === "ai-model"
-              ? {
-                  provider: "openai-compatible",
-                  baseUrl: localUrl || "http://localhost:11434",
-                  model: name,
-                }
-              : {
-                  url: localUrl || "http://localhost:3000",
-                };
+            : {
+                url: localUrl || "http://localhost:3000",
+              };
         const response = await fetch(`${gatewayUrl}/resources`, {
           method: "POST",
           credentials: "include",
@@ -267,9 +260,7 @@ export function AddResourceSlideOver({
               placeholder={
                 type === "database"
                   ? "postgresql://localhost:5433/locallink"
-                  : type === "ai-model"
-                    ? "http://localhost:11434"
-                    : "http://localhost:3000"
+                  : "http://localhost:3000"
               }
               value={localUrl}
               onChange={(event) => setLocalUrl(event.target.value)}
