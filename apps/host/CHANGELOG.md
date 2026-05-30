@@ -1,5 +1,11 @@
 # locallink
 
+## 0.3.8
+
+### Patch Changes
+
+- feeacfc: Use gateway config URL as default in setup prompt instead of hardcoded localhost:3000
+
 ## 0.3.7
 
 ### Patch Changes

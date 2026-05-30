@@ -276,6 +276,13 @@ export default function ResourceDetailPage() {
               <div className="stat-delta">gateway routing</div>
             </div>
           </div>
+          {resource.type !== "web-app" && (
+            <KeysSection
+              keys={keys}
+              onGenerateKey={() => openGenerateKey(resource, handleKeyCreated)}
+              onRevokeKey={revokeKey}
+            />
+          )}
           <RequestsTable logPage={logPage} onPageChange={handleLogPageChange} />
         </>
       )}
