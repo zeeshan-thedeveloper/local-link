@@ -212,24 +212,34 @@ async function resolveResourceConfig(
 async function promptForMissingResourceConfig(
   host: HostLookup,
 ): Promise<HostResourceConfig["config"]> {
+  const rawConfig =
+    host.config && typeof host.config === "object" ? (host.config as Record<string, unknown>) : {};
+
   if (host.type === "database") {
+    const hintConnection =
+      typeof rawConfig.connectionString === "string" && rawConfig.connectionString
+        ? rawConfig.connectionString
+        : undefined;
     const connectionString = await input({
       message: "Postgres connection string:",
-      default: "postgresql://locallink:locallink@localhost:5433/locallink",
+      default: hintConnection ?? "postgresql://locallink:locallink@localhost:5433/locallink",
     });
     return { type: "database", engine: "postgres", connectionString };
   }
   if (host.type === "http-api" || host.type === "web-app" || host.type === "api") {
+    const hintUrl = typeof rawConfig.url === "string" && rawConfig.url ? rawConfig.url : undefined;
     const url = await input({
       message: "Local HTTP base URL:",
-      default: "http://localhost:3000",
+      default: hintUrl ?? "http://localhost:3000",
     });
     return { type: host.type, url };
   }
 
+  const hintBaseUrl =
+    typeof rawConfig.baseUrl === "string" && rawConfig.baseUrl ? rawConfig.baseUrl : undefined;
   const baseUrl = await input({
     message: "Local HTTP base URL:",
-    default: "http://localhost:3000",
+    default: hintBaseUrl ?? "http://localhost:3000",
   });
   return { type: "ai-model", provider: "openai-compatible", baseUrl, model: host.name };
 }
