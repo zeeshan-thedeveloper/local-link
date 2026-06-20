@@ -1,5 +1,11 @@
 # locallink
 
+## 0.3.9
+
+### Patch Changes
+
+- c134e0a: Use gateway config URL as default in setup prompt instead of hardcoded localhost:3000
+
 ## 0.3.8
 
 ### Patch Changes
