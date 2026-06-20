@@ -1,6 +1,8 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { pbkdf2Sync, randomBytes } from "node:crypto";
 
-const KEY_HASH_ALGORITHM = "hmac-sha256";
+const KEY_HASH_ALGORITHM = "pbkdf2-sha512";
+const KEY_HASH_ITERATIONS = 210_000;
+const KEY_HASH_LENGTH = 32;
 
 function getKeyHashSecret() {
   const secret =
@@ -38,6 +40,13 @@ export function createHostToken() {
 }
 
 export function hashApiKey(key: string) {
-  const digest = createHmac("sha256", getKeyHashSecret()).update(key).digest("hex");
-  return `${KEY_HASH_ALGORITHM}:${digest}`;
+  const digest = pbkdf2Sync(
+    key,
+    getKeyHashSecret(),
+    KEY_HASH_ITERATIONS,
+    KEY_HASH_LENGTH,
+    "sha512",
+  ).toString("hex");
+
+  return `${KEY_HASH_ALGORITHM}:${KEY_HASH_ITERATIONS}:${digest}`;
 }
