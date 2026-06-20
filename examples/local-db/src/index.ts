@@ -186,7 +186,6 @@ app.listen(port, () => {
 LocalLink Local DB Example
   Gateway:    ${gateway}
   Resource:   ${resourceId}
-  API Key:    ${apiKeyPreview}
   Listening:  http://localhost:${port}
   `);
 });
