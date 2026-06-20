@@ -1,4 +1,21 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+
+const KEY_HASH_ALGORITHM = "hmac-sha256";
+
+function getKeyHashSecret() {
+  const secret =
+    process.env.API_KEY_HASH_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.JWT_SECRET;
+
+  if (secret) {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Set API_KEY_HASH_SECRET, BETTER_AUTH_SECRET, or JWT_SECRET to hash API keys.");
+  }
+
+  return "locallink-development-key-hash-secret";
+}
 
 export function createApiKey() {
   const secret = randomBytes(32).toString("base64url");
@@ -6,7 +23,7 @@ export function createApiKey() {
   return {
     key,
     prefix: key.slice(0, 10),
-    keyHash: hashApiKey(key)
+    keyHash: hashApiKey(key),
   };
 }
 
@@ -16,10 +33,11 @@ export function createHostToken() {
   return {
     token: key,
     prefix: key.slice(0, 10),
-    tokenHash: hashApiKey(key)
+    tokenHash: hashApiKey(key),
   };
 }
 
 export function hashApiKey(key: string) {
-  return createHash("sha256").update(key).digest("hex");
+  const digest = createHmac("sha256", getKeyHashSecret()).update(key).digest("hex");
+  return `${KEY_HASH_ALGORITHM}:${digest}`;
 }
