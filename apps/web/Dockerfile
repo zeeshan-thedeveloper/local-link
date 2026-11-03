@@ -19,6 +19,10 @@ RUN pnpm --filter @locallink/web... build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# The runtime never uses npm, npx or corepack; drop them (and their bundled
+# dependencies) so they don't ship in the image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /root/.npm
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
