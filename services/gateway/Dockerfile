@@ -34,12 +34,17 @@ RUN rm -rf \
     /prod/gateway/node_modules/.pnpm/node_modules/vite \
     /prod/gateway/node_modules/.pnpm/node_modules/vite-node \
     /prod/gateway/node_modules/.pnpm/node_modules/vitest \
-    /prod/gateway/node_modules/.pnpm/node_modules/@vitest
+    /prod/gateway/node_modules/.pnpm/node_modules/@vitest \
+    /prod/gateway/node_modules/.pnpm/tinypool@* \
+    /prod/gateway/node_modules/.pnpm/node_modules/tinypool
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable
+# The runtime never uses npm, npx or corepack; drop them (and their bundled
+# dependencies) so they don't ship in the image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /root/.npm
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 gateway
 COPY --from=deploy --chown=gateway:nodejs /prod/gateway ./

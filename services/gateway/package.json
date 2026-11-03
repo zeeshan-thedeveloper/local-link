@@ -18,7 +18,7 @@
     "@better-auth/prisma-adapter": "^1.7.14",
     "@fastify/cookie": "^11.1.5",
     "@fastify/cors": "^10.0.2",
-    "@fastify/jwt": "^9.0.3",
+    "@fastify/jwt": "^10.2.7",
     "@locallink/shared": "workspace:*",
     "@locallink/validators": "workspace:*",
     "@opentelemetry/api": "~1.10.0",
