@@ -156,6 +156,11 @@ export default function LoginPage() {
               Continue with GitHub
             </a>
 
+            <p className="login-legal">
+              By continuing you agree to the <Link href="/terms">Terms of Service</Link> and{" "}
+              <Link href="/privacy">Privacy Policy</Link>.
+            </p>
+
             <div className="login-foot">
               Single-user system
               <span className="sep">·</span>

@@ -288,6 +288,16 @@
 .login-foot a { color: var(--text-2); text-decoration: none; }
 .login-foot a:hover { color: var(--text-0); }
 
+.login-legal {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+  text-align: center;
+}
+.login-legal a { color: var(--text-1); text-decoration: none; font-weight: 500; }
+.login-legal a:hover { color: var(--text-0); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ============ WINDOW FOOTER ============ */
 .login-window-foot {
   display: flex;

@@ -17,6 +17,14 @@ const gatewayUrl =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3003";
 const currentUserUpdatedEvent = "locallink:current-user-updated";
 
+const shellFreePaths = ["/", "/login", "/privacy", "/terms"];
+
+function isShellFree(pathname: string) {
+  return shellFreePaths.some((path) =>
+    path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
+
 export function useCurrentUser() {
   return useContext(CurrentUserContext);
 }
@@ -110,7 +118,7 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
-    if (pathname === "/" || pathname.startsWith("/login")) return;
+    if (isShellFree(pathname)) return;
 
     let cancelled = false;
     const hydrateUser = async () => {
@@ -132,7 +140,7 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname === "/" || pathname.startsWith("/login")) return;
+    if (isShellFree(pathname)) return;
 
     let cancelled = false;
     const loadHostStatus = async () => {
@@ -161,7 +169,7 @@ export function AppShell({
     setTimeout(() => setToast(null), 1800);
   };
 
-  if (pathname === "/" || pathname.startsWith("/login")) {
+  if (isShellFree(pathname)) {
     return (
       <CurrentUserContext.Provider value={user}>
         <OverlayContextProvider value={overlayValue}>{children}</OverlayContextProvider>
