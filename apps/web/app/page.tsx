@@ -884,6 +884,10 @@ export default function LandingPage() {
           <a href="https://github.com">GitHub</a>
           <span className="sep">·</span>
           <a href="/login">Sign in</a>
+          <span className="sep">·</span>
+          <a href="/privacy">Privacy</a>
+          <span className="sep">·</span>
+          <a href="/terms">Terms</a>
           <div className="l-foot-meta">
             <span>build · 8h2j4a</span>
             <span>·</span>
