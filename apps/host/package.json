@@ -34,6 +34,6 @@
   "devDependencies": {
     "@locallink/tsconfig": "workspace:*",
     "@types/pg": "^8.23.1",
-    "tsx": "^4.23.12"
+    "tsx": "^4.23.15"
   }
 }
