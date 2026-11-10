@@ -28,7 +28,7 @@ jobs:
       - run: pnpm build
 
       - name: Version packages (changesets)
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           commit: "chore: version packages"
           title: "chore: version packages"
